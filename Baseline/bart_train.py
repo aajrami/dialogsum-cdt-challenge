@@ -4,7 +4,7 @@ from transformers import AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq, Seq2SeqT
 from transformers import AutoTokenizer
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES']="6,7"
+#os.environ['CUDA_VISIBLE_DEVICES']="6,7"
 
 model_checkpoint = "facebook/bart-large"
 metric = load_metric("rouge.py")
