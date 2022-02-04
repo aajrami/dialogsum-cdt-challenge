@@ -2,7 +2,7 @@ from scripts.summary_dataset import SummaryDataset
 import json
 import os
 import os.path as op
-
+from processing.vocab import Vocab
 
 DATA_DIR = "DialogSum_Data"
 

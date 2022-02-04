@@ -1,6 +1,6 @@
 import pickle
 import json
-from processing.tokenize import tokenize_sentence
+from processing.summary_tokenize import tokenize_sentence
 
 SOS_token = 0
 EOS_token = 1
@@ -48,7 +48,7 @@ def load_vocab(filepath):
 
 if __name__=='__main__':
    
-    train_path = '../DialogSum_Data/dialogsum.sample.tok.jsonl'
+    train_path = 'DialogSum_Data/dialogsum.sample.tok.jsonl'
 
     dialogues = []
     summaries = []
@@ -62,8 +62,8 @@ if __name__=='__main__':
     summary_vcb = create_vocab('summary', summaries)
     dialogue_vcb = create_vocab('dialogue', dialogues)
 
-    summary_vcb_path = '../DialogSum_Data/summary.vcb'
-    dialogue_vcb_path = '../DialogSum_Data/dialogue.vcb'
+    summary_vcb_path = 'DialogSum_Data/summary.vcb'
+    dialogue_vcb_path = 'DialogSum_Data/dialogue.vcb'
 
     with open(summary_vcb_path, "wb") as summ_vcb:
         pickle.dump(summary_vcb, summ_vcb)
