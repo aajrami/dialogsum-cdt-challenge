@@ -1,6 +1,6 @@
 import pickle
 import json
-from processing.summary_tokenize import tokenize_sentence
+from processing.data_tokenize import tokenize_sentence
 
 SOS_token = 0
 EOS_token = 1

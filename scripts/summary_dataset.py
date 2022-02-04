@@ -1,8 +1,7 @@
 import torch
 from torch.utils.data import Dataset
 from sentence_transformers import SentenceTransformer
-from processing.vocab import Vocab, load_vocab
-from processing.data_tokenize
+from processing.vocab import Vocab, load_vocab, sentence_to_tensor
 
 class SummaryDataset(Dataset):
     """
@@ -55,10 +54,11 @@ class SummaryDataset(Dataset):
   
     def _summary_encode(self, summary_text):
         """TODO"""
-        
-        print("_summary_encode not yet implemented")
-        output = torch.Tensor([1])
+       
+        output = sentence_to_tensor(summary_text, self.target_vocab)
+ 
         if self.debug == True:
+            print(summary_text)
             print(output)
             input()
         return output  
