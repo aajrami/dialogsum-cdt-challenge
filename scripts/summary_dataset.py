@@ -39,11 +39,14 @@ class SummaryDataset(Dataset):
 
         return len(self.target_text)
 
-    def _dialogue_encode(self, index):
-        """ TODO"""    
-        pass
+    def _dialogue_encode(self, dialogue_text):
+        """ TODO"""
+        utterances = dialogue_text.split("\n")
+        print(utterances)
+        input()
+        return self.sentence_transformer.encode(utterances)
     
-    def _summary_encode(self, index):
+    def _summary_encode(self, summary_text):
         """TODO"""
         
         print("_summary_encode not yet implemented")
@@ -62,22 +65,11 @@ class SummaryDataset(Dataset):
         source_text = datapoint_dict["dialogue"]
         target_text = datapoint_dict["summary"]
 
-        # cleaning data so as to ensure data is in string type
-        source_text = " ".join(source_text.split())
-        target_text = " ".join(target_text.split())
-
         source = self._dialogue_encode(self, idx)
-        target = self._dialogue_encode(self, idx)
+        target = self._summary_encode(self, idx)
 
-
-        source_ids = source["input_ids"].squeeze()
-        source_mask = source["attention_mask"].squeeze()
-        target_ids = target["input_ids"].squeeze()
-        target_mask = target["attention_mask"].squeeze()
 
         return {
-            "source_ids": source_ids.to(dtype=torch.long),
-            "source_mask": source_mask.to(dtype=torch.long),
-            "target_ids": target_ids.to(dtype=torch.long),
-            "target_ids_y": target_ids.to(dtype=torch.long),
+            "source": source.to(dtype=torch.long),
+            "target": target.to(dtype=torch.long),
         }
