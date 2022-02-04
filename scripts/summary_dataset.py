@@ -9,7 +9,6 @@ class SummaryDataset(Dataset):
 
     def __init__(
         self, source_target_list,
-              dialogue_sent_tokenizer, 
               source_sent_len = 100,
               target_sent_len = 100,    
               sentence_transformers_model=None):
@@ -24,11 +23,12 @@ class SummaryDataset(Dataset):
             source_text (str): column name of source text
             target_text (str): column name of target text
         """
-        self.tokenizer = tokenizer
+        self.source_target_list = source_target_list
         if sentence_transformers_model:
-            self.sentence_transformers_model = SentenceTransformer("all-MiniLM-L6-v2")
+            self.sentence_transformer = SentenceTransformer(sentence_transformers_model)
+            self.tokenizer = None,
         import pdb; pdb.set_trace()
-        self.data = dataframe
+
         self.source_len = source_len
         self.summ_len = target_len
         self.target_text = self.data[target_text]
@@ -57,8 +57,10 @@ class SummaryDataset(Dataset):
 
         return the input ids, attention masks and target ids"""
 
-        source_text = str(self.source_text[index])
-        target_text = str(self.target_text[index])
+        datapoint_dict = self.source_target_list[index]
+        
+        source_text = datapoint_dict["dialogue"]
+        target_text = datapoint_dict["summary"]
 
         # cleaning data so as to ensure data is in string type
         source_text = " ".join(source_text.split())
@@ -67,22 +69,6 @@ class SummaryDataset(Dataset):
         source = self._dialogue_encode(self, idx)
         target = self._dialogue_encode(self, idx)
 
-#        source = self.tokenizer.batch_encode_plus(
-#            [source_text],
-#            max_length=self.source_len,
-#            pad_to_max_length=True,
-#            truncation=True,
-#            padding="max_length",
-#            return_tensors="pt",
-#        )
-#        target = self.tokenizer.batch_encode_plus(
-#            [target_text],
-#            max_length=self.summ_len,
-#            pad_to_max_length=True,
-#            truncation=True,
-#            padding="max_length",
-#            return_tensors="pt",
-#        )
 
         source_ids = source["input_ids"].squeeze()
         source_mask = source["attention_mask"].squeeze()

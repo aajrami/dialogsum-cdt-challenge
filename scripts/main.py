@@ -25,5 +25,7 @@ def load_jsonl(filepath):
 
 
 if __name__ == "__main__":
-    dev_dataset = SummaryDataset(DEV_DATA, )    
+    dev_data_list = load_jsonl(DEV_DATA)
+    dev_dataset = SummaryDataset(dev_data_list, 
+                  sentence_transformers_model = "all-MiniLM-L6-v2")   
 
