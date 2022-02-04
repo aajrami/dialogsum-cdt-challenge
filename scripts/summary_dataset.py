@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import Dataset
 from sentence_transformers import SentenceTransformer
 from processing.vocab import Vocab, load_vocab
+from processing.data_tokenize
 
 class SummaryDataset(Dataset):
     """
