@@ -1,9 +1,6 @@
 import pickle
 import json
-if __name__ == "__main__":
-    from data_tokenize import tokenize_sentence
-else:
-    from processing.data_tokenize import tokenize_sentence
+from data_tokenize import tokenize_sentence
 
 SOS_token = 0
 EOS_token = 1
@@ -13,8 +10,8 @@ class Vocab:
         self.name = name
         self.word2index = {}
         self.word2count = {}
-        self.index2word = {0: "SOS", 1: "EOS", 2: "UNK"}
-        self.n_words = 3  # Count SOS and EOS
+        self.index2word = {0: "SOS", 1: "EOS"}
+        self.n_words = 2  # Count SOS and EOS
 
     def addSentence(self, sentence):
         for word in sentence.split(' '):
@@ -37,11 +34,11 @@ def create_vocab(name, sentences):
 
 def sentence_to_tensor(sent, vocab):
     sent = tokenize_sentence(sent)
-    tensor = [vocab.word2index.get(w,2) for w in sent]
+    tensor = [vocab.word2index[w] for w in sent]
     return tensor
 
 def tensor_to_sentence(tensor, vocab):
-    sent = [vocab.index2word.get(i,"UNK") for i in tensor]
+    sent = [vocab.index2word[i] for i in tensor]
     return sent
 
 def load_vocab(filepath):
@@ -65,8 +62,8 @@ if __name__=='__main__':
     summary_vcb = create_vocab('summary', summaries)
     dialogue_vcb = create_vocab('dialogue', dialogues)
 
-    summary_vcb_path = 'DialogSum_Data/sample_summary.vcb'
-    dialogue_vcb_path = 'DialogSum_Data/sample_dialogue.vcb'
+    summary_vcb_path = 'DialogSum_Data/summary.vcb'
+    dialogue_vcb_path = 'DialogSum_Data/dialogue.vcb'
 
     with open(summary_vcb_path, "wb") as summ_vcb:
         pickle.dump(summary_vcb, summ_vcb)
