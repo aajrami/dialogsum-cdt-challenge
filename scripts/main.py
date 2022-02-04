@@ -28,6 +28,6 @@ if __name__ == "__main__":
     dev_data_list = load_jsonl(DEV_DATA)
     dev_dataset = SummaryDataset(dev_data_list, 
                   sentence_transformers_model = "all-MiniLM-L6-v2",
-                    debug=True)   
+                  debug=True)   
     for i in dev_dataset:
         pass
