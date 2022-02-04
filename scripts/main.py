@@ -1,4 +1,4 @@
-#from summary_dataset import SummaryDataset
+from summary_dataset import SummaryDataset
 import json
 import os
 import os.path as op
@@ -23,8 +23,9 @@ def load_jsonl(filepath):
 
     return output_list
 
-print(load_jsonl(TRAIN_DATA))
 
-import pdb; pdb.set_trace()
-
+if __name__ == "__main__":
+    dev_data_list = load_jsonl(DEV_DATA)
+    dev_dataset = SummaryDataset(dev_data_list, 
+                  sentence_transformers_model = "all-MiniLM-L6-v2")   
 
