@@ -11,7 +11,8 @@ class SummaryDataset(Dataset):
         self, source_target_list,
               source_sent_len = 100,
               target_sent_len = 100,    
-              sentence_transformers_model=None):
+              sentence_transformers_model=None,
+              debug=False):
         """
         Initializes a Dataset class
 
@@ -23,34 +24,40 @@ class SummaryDataset(Dataset):
             source_text (str): column name of source text
             target_text (str): column name of target text
         """
+        self.debug = debug
         self.source_target_list = source_target_list
         if sentence_transformers_model:
             self.sentence_transformer = SentenceTransformer(sentence_transformers_model)
             self.tokenizer = None,
-        import pdb; pdb.set_trace()
 
-        self.source_len = source_len
-        self.summ_len = target_len
-        self.target_text = self.data[target_text]
-        self.source_text = self.data[source_text]
+        self.source_embedding_dimension = self.sentence_transformer.get_sentence_embedding_dimension()
+        self.source_sent_len = source_sent_len # unused so far 
+        self.target_sent_len = target_sent_len # unused so far
 
     def __len__(self):
         """returns the length of dataframe"""
 
-        return len(self.target_text)
+        return len(self.source_target_list)
 
     def _dialogue_encode(self, dialogue_text):
         """ TODO"""
         utterances = dialogue_text.split("\n")
-        print(utterances)
-        input()
-        return self.sentence_transformer.encode(utterances)
-    
+        encoding = self.sentence_transformer.encode(utterances)
+        encoding = torch.Tensor(encoding)
+        if self.debug == True:
+            print(utterances)
+            print(encoding.shape)
+        return encoding
+  
     def _summary_encode(self, summary_text):
         """TODO"""
         
         print("_summary_encode not yet implemented")
-        return Torch.tensor([1])        
+        output = torch.Tensor([1])
+        if self.debug == True:
+            print(output)
+            input()
+        return output  
 
 
     def __getitem__(self, index):
@@ -65,8 +72,8 @@ class SummaryDataset(Dataset):
         source_text = datapoint_dict["dialogue"]
         target_text = datapoint_dict["summary"]
 
-        source = self._dialogue_encode(self, idx)
-        target = self._summary_encode(self, idx)
+        source = self._dialogue_encode(source_text)
+        target = self._summary_encode(source_text)
 
 
         return {
