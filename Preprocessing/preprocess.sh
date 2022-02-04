@@ -12,8 +12,8 @@
 
 # bpe
 
-module load python/anaconda3
-source activate dialogsum
+# module load python/anaconda3
+# source activate dialogsum
 
 subword-nmt learn-bpe -s 32000 < DialogSum_Data/dialogsum.sample.jsonl > codes_file.bpe
-subword-nmt apply-bpe -c codes_file.bpe < DialogSum_Data/dialogsum.sample.tok.bpe
+subword-nmt apply-bpe -c codes_file.bpe < DialogSum_Data/dialogsum.sample.tok > DialogSum_Data/dialogsum.sample.tok.bpe
