@@ -54,7 +54,7 @@ class SummaryDataset(Dataset):
   
     def _summary_encode(self, summary_text):
         """TODO"""
-       
+        summary_text = summary_text.strip("\n")
         output = sentence_to_tensor(summary_text, self.target_vocab)
  
         if self.debug == True:
