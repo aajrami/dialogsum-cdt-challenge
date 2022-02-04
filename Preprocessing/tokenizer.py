@@ -25,7 +25,6 @@ if __name__=="__main__":
         with open('DialogSum_Data/dialogsum.sample.tok', "w+") as f2:
             for line in f1:
                 d = json.loads(line)
-                print(d)
                 dialogue = d['dialogue']
                 summary = d['summary']
 
@@ -35,8 +34,8 @@ if __name__=="__main__":
                     mwe.append('\n#Person{}#:'.format(i))
                     mwe.append('#Person{}#'.format(i))
 
-                tok_dialogue = ' '.join(multiword_tokenize(dialogue, mwe))
-                tok_summary = ' '.join(multiword_tokenize(summary, mwe))
+                tok_dialogue = ' '.join(multiword_tokenize(dialogue, mwe)).strip()
+                tok_summary = ' '.join(multiword_tokenize(summary, mwe)).strip()
 
                 d['dialogue'] = tok_dialogue
                 d['summary'] = tok_summary
