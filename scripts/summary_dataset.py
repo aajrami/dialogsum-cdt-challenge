@@ -1,5 +1,6 @@
 import torch
 from torch.utils.data import Dataset
+from sentence_transformers import SentenceTransformer
 
 class SummaryDataset(Dataset):
     """
@@ -7,8 +8,11 @@ class SummaryDataset(Dataset):
     """
 
     def __init__(
-        self, dataframe, tokenizer, source_len, target_len, source_text, target_text
-    ):
+        self, source_target_list,
+              dialogue_sent_tokenizer, 
+              source_sent_len = 100,
+              target_sent_len = 100,    
+              sentence_transformers_model=None):
         """
         Initializes a Dataset class
 
@@ -21,6 +25,9 @@ class SummaryDataset(Dataset):
             target_text (str): column name of target text
         """
         self.tokenizer = tokenizer
+        if sentence_transformers_model:
+            self.sentence_transformers_model = SentenceTransformer("all-MiniLM-L6-v2")
+        import pdb; pdb.set_trace()
         self.data = dataframe
         self.source_len = source_len
         self.summ_len = target_len
@@ -38,7 +45,10 @@ class SummaryDataset(Dataset):
     
     def _summary_encode(self, index):
         """TODO"""
-        pass
+        
+        print("_summary_encode not yet implemented")
+        return Torch.tensor([1])        
+
 
     def __getitem__(self, index):
         """
