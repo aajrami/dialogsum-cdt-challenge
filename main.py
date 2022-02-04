@@ -1,4 +1,4 @@
-from summary_dataset import SummaryDataset
+from scripts.summary_dataset import SummaryDataset
 import json
 import os
 import os.path as op

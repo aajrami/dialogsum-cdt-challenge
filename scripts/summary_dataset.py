@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import Dataset
 from sentence_transformers import SentenceTransformer
-from processing.
+from processing.vocab import Vocab, load_vocab
 
 class SummaryDataset(Dataset):
     """
@@ -13,6 +13,7 @@ class SummaryDataset(Dataset):
               source_sent_len = 100,
               target_sent_len = 100,    
               sentence_transformers_model=None,
+              summary_vocab_path = 'DialogSum_Data/summary.vcb',
               debug=False):
         """
         Initializes a Dataset class
@@ -34,6 +35,7 @@ class SummaryDataset(Dataset):
         self.source_embedding_dimension = self.sentence_transformer.get_sentence_embedding_dimension()
         self.source_sent_len = source_sent_len # unused so far 
         self.target_sent_len = target_sent_len # unused so far
+        self.target_vocab = load_vocab(summary_vocab_path)
 
     def __len__(self):
         """returns the length of dataframe"""

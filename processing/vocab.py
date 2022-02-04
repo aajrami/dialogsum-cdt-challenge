@@ -47,7 +47,7 @@ def load_vocab(filepath):
     return vocab
 
 if __name__=='__main__':
-
+   
     train_path = '../DialogSum_Data/dialogsum.sample.tok.jsonl'
 
     dialogues = []
