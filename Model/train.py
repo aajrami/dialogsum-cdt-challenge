@@ -175,9 +175,9 @@ def trainIters(encoder, decoder, train_dataset, num_epochs, batch_size=1, print_
             training_pair = train_dataset[i]
             input_tensor = training_pair['source'].unsqueeze(0)
             output_tensor = training_pair['target'].unsqueeze(0)
-            batch_size=2
-            input_tensor = torch.cat([input_tensor, input_tensor], dim=0)
-            output_tensor = torch.cat([output_tensor, output_tensor], dim=0)
+            # batch_size=2
+            # input_tensor = torch.cat([input_tensor, input_tensor], dim=0)
+            # output_tensor = torch.cat([output_tensor, output_tensor], dim=0)
 
             loss = train(input_tensor, output_tensor, encoder,
                         decoder, encoder_optimizer, decoder_optimizer, 
