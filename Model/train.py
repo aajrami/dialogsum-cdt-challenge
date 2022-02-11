@@ -21,7 +21,7 @@ import numpy as np
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 SOS_token = 0
 EOS_token = 1
-MAX_LENGTH = 1
+MAX_LENGTH = 100
 teacher_forcing_ratio = 0.5
 
 DATA_DIR = "DialogSum_Data"
@@ -82,7 +82,8 @@ def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, deco
     loss = 0
 
     if debug: print('ENCODING')
-    for ei in range(max_length):
+    ### NEED TO CHANGE TO IMPLEMENT SOME MAX LENGTH
+    for ei in range(input_length):
         if debug: print(f'\nencoding sentence: {ei}')
 
         batch_encoder_inputs = input_tensor[:,ei,:].reshape(batch_size, 1, -1)
@@ -118,7 +119,7 @@ def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, deco
 
     if debug: print('\nDECODING')
     # CHANGE BACK TO USE TEACHER FORCING
-    if True: #use_teacher_forcing:
+    if use_teacher_forcing:
         # Teacher forcing: Feed the target as the next input
         for di in range(output_length):
             if debug: print(f'\nDECODING STEP : {di}\n')
@@ -142,10 +143,10 @@ def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, deco
         for di in range(output_length):
             batch_decoder_output, batch_decoder_hidden, decoder_attention = decoder(
                 batch_decoder_input, batch_decoder_hidden, batch_encoder_hidden_states)
-            topv, topi = decoder_output.topk(1)
+            topv, topi = batch_decoder_output.topk(1)
             decoder_input = topi.squeeze().detach()  # detach from history as input
 
-            loss += criterion(decoder_output, output_tensor[di])
+            loss += criterion(batch_decoder_output, output_tensor[:,di].to(torch.long))
             if decoder_input.item() == EOS_token:
                 break
 
@@ -218,7 +219,7 @@ if __name__=="__main__":
     vocab_size = len(summary_vcb.index2word)
 
     # Create Dataset clas
-    train_data_list = load_jsonl(SAMPLE_DATA)
+    train_data_list = load_jsonl(TRAIN_DATA)
     train_dataset = SummaryDataset(train_data_list,
                                     sentence_transformers_model="all-MiniLM-L6-v2",
                                     debug=False)
@@ -234,8 +235,9 @@ if __name__=="__main__":
     # IF WANT DIFFERENT REFACTOR DECODER INIT
     sent_embedding_size = train_dataset.source_embedding_dimension
     hidden_size = 3
+    num_epochs = 10
 
     print(summary_vcb.n_words)
     encoder = EncoderRNN(sent_embedding_size, hidden_size)
     attn_decoder = AttnDecoderRNN(hidden_size, summary_vcb.n_words, dropout_p=0.1, max_length=MAX_LENGTH).to(device)
-    trainIters(encoder, attn_decoder, train_dataset, batch_size=1, num_epochs=3, print_every=500, debug=False)
+    trainIters(encoder, attn_decoder, train_dataset, batch_size=1, num_epochs=num_epochs, print_every=500, debug=False)
