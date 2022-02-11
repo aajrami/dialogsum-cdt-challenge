@@ -21,7 +21,7 @@ import numpy as np
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 SOS_token = 0
 EOS_token = 1
-MAX_LENGTH = 10
+MAX_LENGTH = 100
 teacher_forcing_ratio = 0.5
 
 DATA_DIR = "DialogSum_Data"
@@ -66,7 +66,12 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
     input_length = input_tensor.size(0)
     target_length = target_tensor.size(0)
 
+    if debug: print('input_length: {}'.format(input_length))
+    if debug: print('target_length: {}'.format(target_length))
+
     encoder_outputs = torch.zeros(max_length, encoder.hidden_size, device=device)
+
+    if debug: print('encoder outputs: {}'.format(encoder_outputs.shape))
 
     loss = 0
 
@@ -110,7 +115,7 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
     return loss.item() / target_length
 
 
-def trainIters(encoder, decoder, train_dataset, num_epochs, print_every=500, plot_every=100, learning_rate=0.01):
+def trainIters(encoder, decoder, train_dataset, num_epochs, print_every=500, plot_every=100, learning_rate=0.01, debug=False):
     start = time.time()
     plot_losses = []
     print_loss_total = 0  # Reset every print_every
@@ -129,7 +134,7 @@ def trainIters(encoder, decoder, train_dataset, num_epochs, print_every=500, plo
             target_tensor = training_pair['target']
 
             loss = train(input_tensor, target_tensor, encoder,
-                        decoder, encoder_optimizer, decoder_optimizer, criterion)
+                        decoder, encoder_optimizer, decoder_optimizer, criterion, debug=debug)
             print_loss_total += loss
             plot_loss_total += loss
 
@@ -184,4 +189,4 @@ if __name__=="__main__":
 
     encoder = EncoderRNN(sent_embedding_size, hidden_size)
     attn_decoder = AttnDecoderRNN(hidden_size, summary_vcb.n_words, dropout_p=0.1).to(device)
-    trainIters(encoder, attn_decoder, train_dataset, num_epochs=3, print_every=500)
+    trainIters(encoder, attn_decoder, train_dataset, num_epochs=3, print_every=500, debug=True)
