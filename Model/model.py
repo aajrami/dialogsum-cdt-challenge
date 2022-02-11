@@ -15,7 +15,7 @@ import numpy as np
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+debug = True
 
 # input size = sentence embedding size
 # hidden size = hyper-parameter
@@ -24,12 +24,14 @@ class EncoderRNN(nn.Module):
         super(EncoderRNN, self).__init__()
         self.hidden_size = hidden_size
         # self.embedding = nn.Embedding(input_size, hidden_size)
-        self.gru = nn.GRU(input_size, hidden_size)
+        self.gru = nn.GRU(input_size, hidden_size, batch_first=True)
 
     def forward(self, input, hidden):
         # embedded = self.embedding(input).view(1, 1, -1)
         # output = embedded
         # output, hidden = self.gru(output, hidden)
+        if debug: print(f'input : {input.shape}')
+        if debug: print(f'hidden : {hidden.shape}')
         output, hidden = self.gru(input, hidden)
         
         return output, hidden
@@ -51,35 +53,44 @@ class AttnDecoderRNN(nn.Module):
         self.attn = nn.Linear(self.hidden_size * 2, self.max_length)
         self.attn_combine = nn.Linear(self.hidden_size * 2, self.hidden_size)
         self.dropout = nn.Dropout(self.dropout_p)
-        self.gru = nn.GRU(self.hidden_size, self.hidden_size)
+        self.gru = nn.GRU(self.hidden_size, self.hidden_size, batch_first=True)
         self.out = nn.Linear(self.hidden_size, self.output_size)
 
-    def forward(self, input, hidden, encoder_outputs):
+    def forward(self, input, hidden, encoder_hidden):
+
+        if debug: print(f'input: {input.shape}')
+        if debug: print(f'hidden: {hidden.shape}')
+        if debug: print(f'encoder_hidden {encoder_hidden.shape}')
 
         ####################################################
         # REPLACE WITH WORD2VEC LOOKUP
-        embedded = self.embedding(input).view(1, 1, -1)
+        embedded = self.embedding(input)#.view(1, 1, -1)
         #embedded = torch.randn(hidden_size).view(1, 1, -1)
         ####################################################
+        if debug: print(f'input word embedding: {embedded.shape}')
 
         embedded = self.dropout(embedded)
 
-        attn_weights = F.softmax(
-            self.attn(torch.cat((embedded[0], hidden[0]), 1)), dim=1)
-        print(attn_weights.shape)
-        print(encoder_outputs.shape)
-        print(attn_weights.unsqueeze(0).shape)
-        print(encoder_outputs.unsqueeze(0).shape)
-        attn_applied = torch.bmm(attn_weights.unsqueeze(0),
-                                 encoder_outputs.unsqueeze(0))
+        if debug: print(f'embedded[:,0] : {embedded[:,0].shape}')
+        if debug: print(f'hidden[:,0] : {hidden[:,0].shape}')
+        if debug: print(f'torch.cat((embedded[:,0], hidden[:,0]), 1) : {torch.cat((embedded[:,0], hidden[:,0]), 1).shape}')
+        if debug: print(f'self.attn : {self.attn.shape}')
 
-        output = torch.cat((embedded[0], attn_applied[0]), 1)
-        output = self.attn_combine(output).unsqueeze(0)
+        attn_weights = F.softmax(
+            self.attn(torch.cat((embedded[:,0], hidden[:,0]), 1)), dim=1)
+        
+        if debug: print(f'attn weights: {attn_weights.shape}')
+        if debug: print(f'attn weights: {attn_weights}')
+        attn_applied = torch.bmm(attn_weights,
+                                 encoder_hidden)
+
+        output = torch.cat((embedded[:,0], attn_applied[:,0]), 1)
+        output = self.attn_combine(output)
 
         output = F.relu(output)
-        output, hidden = self.gru(output, hidden)
+        output, hidden = self.gru(output, hidden, batch_first=True)
 
-        output = F.log_softmax(self.out(output[0]), dim=1)
+        output = F.log_softmax(self.out(output[:,0]), dim=1)
         return output, hidden, attn_weights
 
     def initHidden(self):

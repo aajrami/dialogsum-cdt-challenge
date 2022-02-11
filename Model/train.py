@@ -21,7 +21,7 @@ import numpy as np
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 SOS_token = 0
 EOS_token = 1
-MAX_LENGTH = 100
+MAX_LENGTH = 4
 teacher_forcing_ratio = 0.5
 
 DATA_DIR = "DialogSum_Data"
@@ -63,66 +63,77 @@ def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, deco
     if debug: print('input tensor: {}'.format(input_tensor.shape))
     if debug: print('output tensor: {}'.format(output_tensor.shape))
 
-    # ACCOUNT FOR BATCH SIZE BEING 1
-    if batch_size==1:
-        input_tensor = input_tensor.unsqueeze(0)
-
-    if batch_size==1:
-        output_tensor = output_tensor.unsqueeze(0)
-
     encoder_optimizer.zero_grad()
     decoder_optimizer.zero_grad()
 
     input_length = input_tensor.size(1)
     output_length = output_tensor.size(1)
 
-    if debug: print('input tensor: {}'.format(input_tensor.shape))
+    if debug: print('\ninput tensor: {}'.format(input_tensor.shape))
     if debug: print('output tensor: {}'.format(output_tensor.shape))
 
-    if debug: print('input_length: {}'.format(input_length))
+    if debug: print('\ninput_length: {}'.format(input_length))
     if debug: print('output_length: {}'.format(output_length))
 
-    batch_encoder_outputs = torch.zeros(batch_size, max_length, encoder.hidden_size, device=device)
+    batch_encoder_hidden_states = torch.zeros(batch_size, max_length, encoder.hidden_size, device=device)
 
-    if debug: print('encoder outputs: {}'.format(batch_encoder_outputs.shape))
-
+    if debug: print('\nencoder outputs: {}'.format(batch_encoder_hidden_states.shape))
+    if debug: print(f'encoder hidden_states: {batch_encoder_hidden_states}')
     loss = 0
 
-    for ei in range(input_length):
+    if debug: print('ENCODING')
+    for ei in range(max_length):
+        if debug: print(f'\nencoding sentence: {ei}')
+
         batch_encoder_inputs = input_tensor[:,ei,:].view(batch_size, 1, -1)
         if debug: print(f'batch_encoder_inputs: {batch_encoder_inputs.shape}')
+
         batch_encoder_output, batch_encoder_hidden = encoder(
             batch_encoder_inputs, batch_encoder_hidden)
+
         if debug: print(f'encoder_output: {batch_encoder_output.shape}')
         if debug: print(f'encoder_hidden: {batch_encoder_hidden.shape}')
-        batch_encoder_outputs[:,ei,:] = batch_encoder_output[0, 0]
+        if debug: print(f'batch_encoder_output: {batch_encoder_output}')
+        if debug: print(f'batch_encoder_hidden: {batch_encoder_hidden}')
 
+        # MIGHT NOT WORK WITH BATCHING
+        batch_encoder_hidden_states[:,ei,:] = batch_encoder_output[0, 0]
+        if debug: print(f'encoder hidden_states: {batch_encoder_hidden_states}')
+
+    # batch_encoder_hidden_states, batch_encoder_hidden = encoder(input_tensor, batch_encoder_hidden)
+
+    if debug: print(f'encoder hidden_states: {batch_encoder_hidden_states}')
+
+    if debug: print('\nFINISHED ENCODING')
+    if debug: print(f'batch_encoder_hidden_states {batch_encoder_hidden_states.shape}')
     if debug: print(f'batch_encoder_hidden {batch_encoder_hidden.shape}')
-    decoder_input = torch.tensor([[SOS_token]], device=device)
+    
+    batch_decoder_input = torch.tensor([[SOS_token]], device=device)
 
     batch_decoder_hidden = batch_encoder_hidden
 
-    if debug: print('decoder hidden: {}'.format(batch_decoder_hidden.shape))
+    if debug: print(f'decoder hidden: {batch_decoder_hidden.shape}')
     use_teacher_forcing = True if random.random() < teacher_forcing_ratio else False
 
+    if debug: print('\nDECODING')
     # CHANGE BACK TO USE TEACHER FORCING
-    if True:
+    if True: #use_teacher_forcing:
         # Teacher forcing: Feed the target as the next input
         for di in range(output_length):
-            if debug: print('decoder input: {}'.format(decoder_input.shape))
-            if debug: print(f'decoder hidden {batch_decoder_hidden.shape}')
-            if debug: print(f'encoder outputs {batch_encoder_outputs.shape}')
+            if debug: print(f'batch_decoder input: {batch_decoder_input.shape}')
+            if debug: print(f'batch_decoder hidden {batch_decoder_hidden.shape}')
+            if debug: print(f'batch_encoder_hidden_states: {batch_encoder_hidden_states.shape}')
             
-            decoder_output, batch_decoder_hidden, decoder_attention = decoder(
-                decoder_input, batch_decoder_hidden, batch_encoder_outputs)
-            loss += criterion(decoder_output, output_tensor[di])
-            decoder_input = output_tensor[di]  # Teacher forcing
+            batch_decoder_output, batch_decoder_hidden, decoder_attention = decoder(
+                batch_decoder_input, batch_decoder_hidden, batch_encoder_hidden_states)
+            loss += criterion(batch_decoder_output, output_tensor[di])
+            batch_decoder_input = output_tensor[di]  # Teacher forcing
 
     else:
         # Without teacher forcing: use its own predictions as the next input
         for di in range(output_length):
-            decoder_output, decoder_hidden, decoder_attention = decoder(
-                decoder_input, decoder_hidden, encoder_outputs)
+            batch_decoder_output, batch_decoder_hidden, decoder_attention = decoder(
+                batch_decoder_input, batch_decoder_hidden, batch_encoder_hidden_states)
             topv, topi = decoder_output.topk(1)
             decoder_input = topi.squeeze().detach()  # detach from history as input
 
@@ -152,9 +163,13 @@ def trainIters(encoder, decoder, train_dataset, num_epochs, batch_size=1, print_
     np.random.shuffle(order)
     for epoch in range(1, num_epochs+1):
         for iter, i in enumerate(order):
+
             training_pair = train_dataset[i]
-            input_tensor = training_pair['source']
-            output_tensor = training_pair['target']
+            input_tensor = training_pair['source'].unsqueeze(0)
+            output_tensor = training_pair['target'].unsqueeze(0)
+            batch_size=2
+            input_tensor = torch.cat([input_tensor, input_tensor], dim=0)
+            output_tensor = torch.cat([output_tensor, output_tensor], dim=0)
 
             loss = train(input_tensor, output_tensor, encoder,
                         decoder, encoder_optimizer, decoder_optimizer, 
@@ -209,8 +224,9 @@ if __name__=="__main__":
     # MAKE HIDDEN SIZE SAME AS WORD EMBEDDING SIZE FOR NOW
     # IF WANT DIFFERENT REFACTOR DECODER INIT
     sent_embedding_size = train_dataset.source_embedding_dimension
-    hidden_size = 30
+    hidden_size = 3
 
+    print(summary_vcb.n_words)
     encoder = EncoderRNN(sent_embedding_size, hidden_size)
     attn_decoder = AttnDecoderRNN(hidden_size, summary_vcb.n_words, dropout_p=0.1).to(device)
     trainIters(encoder, attn_decoder, train_dataset, batch_size=1, num_epochs=3, print_every=500, debug=True)
