@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import Dataset
 from sentence_transformers import SentenceTransformer
-from processing.vocab import Vocab, load_vocab, sentence_to_tensor
+from vocab import Vocab, load_vocab, sentence_to_tensor
 
 class SummaryDataset(Dataset):
     """
