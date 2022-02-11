@@ -66,9 +66,6 @@ class SummaryDataset(Dataset):
 
     def __getitem__(self, index):
         """
-        NOT YET IMPLEMENTED
-
-
         return the input ids, attention masks and target ids"""
 
         datapoint_dict = self.source_target_list[index]

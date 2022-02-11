@@ -1,14 +1,19 @@
 from vocab import EOS_token, Vocab, load_vocab, tensor_to_sentence
 
+import time
+import math
+
 import torch
 import torch.nn as nn
 from torch import optim
 import torch.nn.functional as F
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-SOS_token = 0
-EOS_token = 1
-MAX_LENGTH = 10
+import matplotlib.pyplot as plt
+plt.switch_backend('agg')
+import matplotlib.ticker as ticker
+import numpy as np
+
+
 
 # input size = sentence embedding size
 # hidden size = hyper-parameter
@@ -79,7 +84,6 @@ class AttnDecoderRNN(nn.Module):
     def initHidden(self):
         return torch.zeros(1, 1, self.hidden_size, device=device)
 
-
 if __name__=="__main__":
     sent_embedding_size = 20
 
@@ -92,23 +96,7 @@ if __name__=="__main__":
 
     sentence_embeddings = torch.rand((num_sents, sent_embedding_size))
 
-    
-
     encoder = EncoderRNN(sent_embedding_size, hidden_size)
-    encoder_hidden = encoder.initHidden()
-    encoder_outputs = torch.zeros(5, hidden_size, device=device)
-
-    for ei in range(num_sents):
-        
-        encoder_output, encoder_hidden = encoder(
-            sentence_embeddings[ei], encoder_hidden
-        )
-        
-        
-
-        encoder_outputs[ei] = encoder_output[0,0]
-
-
 
     ##################################################################################
 
@@ -119,32 +107,40 @@ if __name__=="__main__":
     decoder_hidden = encoder_hidden
 
 
-    target_length = 3
-    target_tensor = torch.tensor([5, 2, 36])
 
-    use_teacher_forcing = True
-    loss = 0
-    criterion = nn.NLLLoss()
+    hidden_size = 256
+    encoder = EncoderRNN(input_lang.n_words, hidden_size).to(device)
+    attn_decoder = AttnDecoderRNN(hidden_size, output_lang.n_words, dropout_p=0.1).to(device)
 
-    decoder_input = torch.tensor([[SOS_token]], device=device)
+    trainIters(encoder, attn_decoder, 75000, print_every=5000)
 
-    if use_teacher_forcing:
-        # Teacher forcing: Feed the target as the next input
-        for di in range(target_length):
-            decoder_output, decoder_hidden, decoder_attention = decoder(
-                decoder_input, decoder_hidden, encoder_outputs)
-            loss += criterion(decoder_output, target_tensor[di])
-            decoder_input = target_tensor[di]  # Teacher forcing
 
-    else:
-        # Without teacher forcing: use its own predictions as the next input
-        for di in range(target_length):
-            decoder_output, decoder_hidden, decoder_attention = decoder(
-                decoder_input, decoder_hidden, encoder_outputs)
-            topv, topi = decoder_output.topk(1)
-            decoder_input = topi.squeeze().detach()  # detach from history as input
+if __name__=="__main__":
+    sent_embedding_size = 20
 
-            loss += criterion(decoder_output, target_tensor[di])
-            if decoder_input.item() == EOS_token:
-                break
-        
+    # MAKE THIS SAME AS WORD EMBEDDING SIZE FOR NOW
+    # IF WANT DIFFERENT REFACTOR DECODER INIT
+    hidden_size = 30
+    vocab_size = 100
+    num_sents = 5
+
+    sentence_embeddings = torch.rand((num_sents, sent_embedding_size))
+
+    encoder = EncoderRNN(sent_embedding_size, hidden_size)
+
+    ##################################################################################
+
+    summ_vcb = load_vocab('DialogSum_Data/summary.vcb')
+    vocab_size = len(summ_vcb.index2word)
+    output_size = summ_vcb.n_words
+
+    decoder = AttnDecoderRNN(hidden_size, output_size, dropout_p=0.1).to(device)
+    decoder_hidden = encoder_hidden
+
+
+
+    hidden_size = 256
+    encoder = EncoderRNN(input_lang.n_words, hidden_size).to(device)
+    attn_decoder = AttnDecoderRNN(hidden_size, output_lang.n_words, dropout_p=0.1).to(device)
+
+    trainIters(encoder, attn_decoder, 75000, print_every=5000)
