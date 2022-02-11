@@ -74,10 +74,10 @@ class SummaryDataset(Dataset):
         target_text = datapoint_dict["summary"]
 
         source = self._dialogue_encode(source_text)
-        target = self._summary_encode(source_text)
+        target = self._summary_encode(target_text)
 
 
         return {
-            "source": source.to(dtype=torch.long),
-            "target": target.to(dtype=torch.long),
+            "source": source.to(dtype=torch.float),
+            "target": target.to(dtype=torch.float),
         }

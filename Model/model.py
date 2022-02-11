@@ -14,6 +14,8 @@ import matplotlib.ticker as ticker
 import numpy as np
 
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 # input size = sentence embedding size
 # hidden size = hyper-parameter

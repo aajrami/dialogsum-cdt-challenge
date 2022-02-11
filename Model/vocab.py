@@ -2,6 +2,8 @@ import pickle
 import json
 from data_tokenize import tokenize_sentence
 
+import torch
+
 SOS_token = 0
 EOS_token = 1
 
@@ -10,8 +12,8 @@ class Vocab:
         self.name = name
         self.word2index = {}
         self.word2count = {}
-        self.index2word = {0: "SOS", 1: "EOS"}
-        self.n_words = 2  # Count SOS and EOS
+        self.index2word = {0: "SOS", 1: "EOS", 2: "UNK"}
+        self.n_words = 3  # Count SOS and EOS and UNK
 
     def addSentence(self, sentence):
         for word in sentence.split(' '):
@@ -34,11 +36,11 @@ def create_vocab(name, sentences):
 
 def sentence_to_tensor(sent, vocab):
     sent = tokenize_sentence(sent)
-    tensor = [vocab.word2index[w] for w in sent]
+    tensor = torch.Tensor([vocab.word2index.get(w, 3) for w in sent])
     return tensor
 
 def tensor_to_sentence(tensor, vocab):
-    sent = [vocab.index2word[i] for i in tensor]
+    sent = [vocab.index2word.get(i, "UNK") for i in tensor]
     return sent
 
 def load_vocab(filepath):
@@ -48,7 +50,7 @@ def load_vocab(filepath):
 
 if __name__=='__main__':
    
-    train_path = 'DialogSum_Data/dialogsum.sample.tok.jsonl'
+    train_path = 'DialogSum_Data/dialogsum.train.tok.jsonl'
 
     dialogues = []
     summaries = []

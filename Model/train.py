@@ -6,6 +6,7 @@ import time
 import math
 import os.path as op
 import random
+import json
 
 import torch
 import torch.nn as nn
@@ -56,7 +57,7 @@ def timeSince(since, percent):
     return '%s (- %s)' % (asMinutes(s), asMinutes(rs))
 
 ## TRAINING FUNCTIONS
-def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, max_length=MAX_LENGTH):
+def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, max_length=MAX_LENGTH, debug=False):
     encoder_hidden = encoder.initHidden()
 
     encoder_optimizer.zero_grad()
@@ -80,7 +81,8 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
 
     use_teacher_forcing = True if random.random() < teacher_forcing_ratio else False
 
-    if use_teacher_forcing:
+    # CHANGE BACK TO USE TEACHER FORCING
+    if True:
         # Teacher forcing: Feed the target as the next input
         for di in range(target_length):
             decoder_output, decoder_hidden, decoder_attention = decoder(
@@ -118,7 +120,8 @@ def trainIters(encoder, decoder, train_dataset, num_epochs, print_every=500, plo
     decoder_optimizer = optim.Adam(decoder.parameters(), lr=learning_rate)
     criterion = nn.CrossEntropyLoss()
 
-    order = np.random.shuffle(np.arange(len(train_dataset)))
+    order = np.arange(len(train_dataset))
+    np.random.shuffle(order)
     for epoch in range(1, num_epochs+1):
         for iter, i in enumerate(order):
             training_pair = train_dataset[i]
