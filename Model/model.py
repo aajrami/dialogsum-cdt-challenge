@@ -30,7 +30,6 @@ class EncoderRNN(nn.Module):
         # embedded = self.embedding(input).view(1, 1, -1)
         # output = embedded
         # output, hidden = self.gru(output, hidden)
-        input = input.view(1, 1, -1)   
         output, hidden = self.gru(input, hidden)
         
         return output, hidden

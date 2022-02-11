@@ -57,53 +57,76 @@ def timeSince(since, percent):
     return '%s (- %s)' % (asMinutes(s), asMinutes(rs))
 
 ## TRAINING FUNCTIONS
-def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, max_length=MAX_LENGTH, debug=False):
-    encoder_hidden = encoder.initHidden()
+def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, batch_size=1, max_length=MAX_LENGTH, debug=False):
+    batch_encoder_hidden = encoder.initHidden()
+
+    if debug: print('input tensor: {}'.format(input_tensor.shape))
+    if debug: print('output tensor: {}'.format(output_tensor.shape))
+
+    # ACCOUNT FOR BATCH SIZE BEING 1
+    if batch_size==1:
+        input_tensor = input_tensor.unsqueeze(0)
+
+    if batch_size==1:
+        output_tensor = output_tensor.unsqueeze(0)
 
     encoder_optimizer.zero_grad()
     decoder_optimizer.zero_grad()
 
-    input_length = input_tensor.size(0)
-    target_length = target_tensor.size(0)
+    input_length = input_tensor.size(1)
+    output_length = output_tensor.size(1)
+
+    if debug: print('input tensor: {}'.format(input_tensor.shape))
+    if debug: print('output tensor: {}'.format(output_tensor.shape))
 
     if debug: print('input_length: {}'.format(input_length))
-    if debug: print('target_length: {}'.format(target_length))
+    if debug: print('output_length: {}'.format(output_length))
 
-    encoder_outputs = torch.zeros(max_length, encoder.hidden_size, device=device)
+    batch_encoder_outputs = torch.zeros(batch_size, max_length, encoder.hidden_size, device=device)
 
-    if debug: print('encoder outputs: {}'.format(encoder_outputs.shape))
+    if debug: print('encoder outputs: {}'.format(batch_encoder_outputs.shape))
 
     loss = 0
 
     for ei in range(input_length):
-        encoder_output, encoder_hidden = encoder(
-            input_tensor[ei], encoder_hidden)
-        encoder_outputs[ei] = encoder_output[0, 0]
+        batch_encoder_inputs = input_tensor[:,ei,:].view(batch_size, 1, -1)
+        if debug: print(f'batch_encoder_inputs: {batch_encoder_inputs.shape}')
+        batch_encoder_output, batch_encoder_hidden = encoder(
+            batch_encoder_inputs, batch_encoder_hidden)
+        if debug: print(f'encoder_output: {batch_encoder_output.shape}')
+        if debug: print(f'encoder_hidden: {batch_encoder_hidden.shape}')
+        batch_encoder_outputs[:,ei,:] = batch_encoder_output[0, 0]
 
+    if debug: print(f'batch_encoder_hidden {batch_encoder_hidden.shape}')
     decoder_input = torch.tensor([[SOS_token]], device=device)
 
-    decoder_hidden = encoder_hidden
+    batch_decoder_hidden = batch_encoder_hidden
 
+    if debug: print('decoder hidden: {}'.format(batch_decoder_hidden.shape))
     use_teacher_forcing = True if random.random() < teacher_forcing_ratio else False
 
     # CHANGE BACK TO USE TEACHER FORCING
     if True:
         # Teacher forcing: Feed the target as the next input
-        for di in range(target_length):
-            decoder_output, decoder_hidden, decoder_attention = decoder(
-                decoder_input, decoder_hidden, encoder_outputs)
-            loss += criterion(decoder_output, target_tensor[di])
-            decoder_input = target_tensor[di]  # Teacher forcing
+        for di in range(output_length):
+            if debug: print('decoder input: {}'.format(decoder_input.shape))
+            if debug: print(f'decoder hidden {batch_decoder_hidden.shape}')
+            if debug: print(f'encoder outputs {batch_encoder_outputs.shape}')
+            
+            decoder_output, batch_decoder_hidden, decoder_attention = decoder(
+                decoder_input, batch_decoder_hidden, batch_encoder_outputs)
+            loss += criterion(decoder_output, output_tensor[di])
+            decoder_input = output_tensor[di]  # Teacher forcing
 
     else:
         # Without teacher forcing: use its own predictions as the next input
-        for di in range(target_length):
+        for di in range(output_length):
             decoder_output, decoder_hidden, decoder_attention = decoder(
                 decoder_input, decoder_hidden, encoder_outputs)
             topv, topi = decoder_output.topk(1)
             decoder_input = topi.squeeze().detach()  # detach from history as input
 
-            loss += criterion(decoder_output, target_tensor[di])
+            loss += criterion(decoder_output, output_tensor[di])
             if decoder_input.item() == EOS_token:
                 break
 
@@ -112,10 +135,10 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
     encoder_optimizer.step()
     decoder_optimizer.step()
 
-    return loss.item() / target_length
+    return loss.item() / output_length
 
 
-def trainIters(encoder, decoder, train_dataset, num_epochs, print_every=500, plot_every=100, learning_rate=0.01, debug=False):
+def trainIters(encoder, decoder, train_dataset, num_epochs, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False):
     start = time.time()
     plot_losses = []
     print_loss_total = 0  # Reset every print_every
@@ -131,10 +154,11 @@ def trainIters(encoder, decoder, train_dataset, num_epochs, print_every=500, plo
         for iter, i in enumerate(order):
             training_pair = train_dataset[i]
             input_tensor = training_pair['source']
-            target_tensor = training_pair['target']
+            output_tensor = training_pair['target']
 
-            loss = train(input_tensor, target_tensor, encoder,
-                        decoder, encoder_optimizer, decoder_optimizer, criterion, debug=debug)
+            loss = train(input_tensor, output_tensor, encoder,
+                        decoder, encoder_optimizer, decoder_optimizer, 
+                        criterion, batch_size=batch_size, debug=debug)
             print_loss_total += loss
             plot_loss_total += loss
 
@@ -189,4 +213,4 @@ if __name__=="__main__":
 
     encoder = EncoderRNN(sent_embedding_size, hidden_size)
     attn_decoder = AttnDecoderRNN(hidden_size, summary_vcb.n_words, dropout_p=0.1).to(device)
-    trainIters(encoder, attn_decoder, train_dataset, num_epochs=3, print_every=500, debug=True)
+    trainIters(encoder, attn_decoder, train_dataset, batch_size=1, num_epochs=3, print_every=500, debug=True)
