@@ -15,7 +15,7 @@ import numpy as np
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-debug = True
+debug = False
 
 # input size = sentence embedding size
 # hidden size = hyper-parameter
@@ -64,31 +64,44 @@ class AttnDecoderRNN(nn.Module):
 
         ####################################################
         # REPLACE WITH WORD2VEC LOOKUP
-        embedded = self.embedding(input)#.view(1, 1, -1)
-        #embedded = torch.randn(hidden_size).view(1, 1, -1)
+        embedded = self.embedding(input)
+
         ####################################################
         if debug: print(f'input word embedding: {embedded.shape}')
 
         embedded = self.dropout(embedded)
 
         if debug: print(f'embedded[:,0] : {embedded[:,0].shape}')
-        if debug: print(f'hidden[:,0] : {hidden[:,0].shape}')
-        if debug: print(f'torch.cat((embedded[:,0], hidden[:,0]), 1) : {torch.cat((embedded[:,0], hidden[:,0]), 1).shape}')
-        if debug: print(f'self.attn : {self.attn.shape}')
+        if debug: print(f'hidden[:,0] : {hidden[0,:].shape}')
+        if debug: print(f'torch.cat((embedded[:,0], hidden[:,0]), 1) : {torch.cat((embedded[:,0], hidden[0]), 1).shape}')
+        if debug: print(f'self.attn : {self.attn}')
 
         attn_weights = F.softmax(
-            self.attn(torch.cat((embedded[:,0], hidden[:,0]), 1)), dim=1)
+            self.attn(torch.cat((embedded[:,0], hidden[0]), 1)), dim=1).unsqueeze(1)
         
         if debug: print(f'attn weights: {attn_weights.shape}')
-        if debug: print(f'attn weights: {attn_weights}')
+        if debug: print(f'encoder_hidden: {encoder_hidden.shape}')
+
         attn_applied = torch.bmm(attn_weights,
                                  encoder_hidden)
 
+
+
+        if debug: print(f'embedded : {embedded.shape}')
+        if debug: print(f'embedded[:,0] : {embedded[:,0].shape}')
+        if debug: print(f'attn_applied : {attn_applied.shape}')
+        if debug: print(f'attn_applied[:,0] : {attn_applied[:,0].shape}')
+
         output = torch.cat((embedded[:,0], attn_applied[:,0]), 1)
-        output = self.attn_combine(output)
+        if debug: print(f'output : {output.shape}')
+        output = self.attn_combine(output).unsqueeze(1)
+        if debug: print(f'output : {output.shape}')
 
         output = F.relu(output)
-        output, hidden = self.gru(output, hidden, batch_first=True)
+        if debug: print(f'output : {output.shape}')
+        if debug: print(f'hidden : {hidden.shape}')
+
+        output, hidden = self.gru(output, hidden)
 
         output = F.log_softmax(self.out(output[:,0]), dim=1)
         return output, hidden, attn_weights

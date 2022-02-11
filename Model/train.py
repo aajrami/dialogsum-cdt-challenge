@@ -21,7 +21,7 @@ import numpy as np
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 SOS_token = 0
 EOS_token = 1
-MAX_LENGTH = 4
+MAX_LENGTH = 1
 teacher_forcing_ratio = 0.5
 
 DATA_DIR = "DialogSum_Data"
@@ -58,7 +58,7 @@ def timeSince(since, percent):
 
 ## TRAINING FUNCTIONS
 def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, batch_size=1, max_length=MAX_LENGTH, debug=False):
-    batch_encoder_hidden = encoder.initHidden()
+    batch_encoder_hidden = torch.cat(batch_size * [encoder.initHidden()], dim=1)
 
     if debug: print('input tensor: {}'.format(input_tensor.shape))
     if debug: print('output tensor: {}'.format(output_tensor.shape))
@@ -85,7 +85,7 @@ def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, deco
     for ei in range(max_length):
         if debug: print(f'\nencoding sentence: {ei}')
 
-        batch_encoder_inputs = input_tensor[:,ei,:].view(batch_size, 1, -1)
+        batch_encoder_inputs = input_tensor[:,ei,:].reshape(batch_size, 1, -1)
         if debug: print(f'batch_encoder_inputs: {batch_encoder_inputs.shape}')
 
         batch_encoder_output, batch_encoder_hidden = encoder(
@@ -109,6 +109,7 @@ def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, deco
     if debug: print(f'batch_encoder_hidden {batch_encoder_hidden.shape}')
     
     batch_decoder_input = torch.tensor([[SOS_token]], device=device)
+    batch_decoder_input = torch.cat(batch_size * [batch_decoder_input], dim=0)
 
     batch_decoder_hidden = batch_encoder_hidden
 
@@ -120,14 +121,21 @@ def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, deco
     if True: #use_teacher_forcing:
         # Teacher forcing: Feed the target as the next input
         for di in range(output_length):
+            if debug: print(f'\nDECODING STEP : {di}\n')
+
             if debug: print(f'batch_decoder input: {batch_decoder_input.shape}')
             if debug: print(f'batch_decoder hidden {batch_decoder_hidden.shape}')
             if debug: print(f'batch_encoder_hidden_states: {batch_encoder_hidden_states.shape}')
             
             batch_decoder_output, batch_decoder_hidden, decoder_attention = decoder(
                 batch_decoder_input, batch_decoder_hidden, batch_encoder_hidden_states)
-            loss += criterion(batch_decoder_output, output_tensor[di])
-            batch_decoder_input = output_tensor[di]  # Teacher forcing
+
+            if debug: print(f'batch_decoder_output : {batch_decoder_output.shape}')
+            if debug: print(f'batch_decoder_hidden : {batch_decoder_hidden}')
+            if debug: print(f'output tensor : {output_tensor.shape}')
+            
+            loss += criterion(batch_decoder_output, output_tensor[:,di].to(torch.long))
+            batch_decoder_input = output_tensor[:,di].to(torch.long).unsqueeze(1)  # Teacher forcing
 
     else:
         # Without teacher forcing: use its own predictions as the next input
@@ -199,6 +207,7 @@ def showPlot(points):
     loc = ticker.MultipleLocator(base=0.2)
     ax.yaxis.set_major_locator(loc)
     plt.plot(points)
+    plt.savefig('plot.png')
 
 
 if __name__=="__main__":
@@ -228,5 +237,5 @@ if __name__=="__main__":
 
     print(summary_vcb.n_words)
     encoder = EncoderRNN(sent_embedding_size, hidden_size)
-    attn_decoder = AttnDecoderRNN(hidden_size, summary_vcb.n_words, dropout_p=0.1).to(device)
-    trainIters(encoder, attn_decoder, train_dataset, batch_size=1, num_epochs=3, print_every=500, debug=True)
+    attn_decoder = AttnDecoderRNN(hidden_size, summary_vcb.n_words, dropout_p=0.1, max_length=MAX_LENGTH).to(device)
+    trainIters(encoder, attn_decoder, train_dataset, batch_size=1, num_epochs=3, print_every=500, debug=False)
