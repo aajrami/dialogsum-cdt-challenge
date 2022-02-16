@@ -4,7 +4,7 @@ from nltk.tokenize import MWETokenizer
 import os
 import json
 
-nltk.download('punkt')
+#nltk.download('punkt')
 
 def tokenize_sentence(text):
     # create protected mwe 

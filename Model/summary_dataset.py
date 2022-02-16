@@ -1,7 +1,11 @@
+import os
+import os.path as op
 import torch
 from torch.utils.data import Dataset
 from sentence_transformers import SentenceTransformer
 from vocab import Vocab, load_vocab, sentence_to_tensor
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class SummaryDataset(Dataset):
     """
@@ -29,13 +33,38 @@ class SummaryDataset(Dataset):
         self.debug = debug
         self.source_target_list = source_target_list
         if sentence_transformers_model:
-            self.sentence_transformer = SentenceTransformer(sentence_transformers_model)
+            self.sentence_transformer = self.load_sentence_transformers_model(sentence_transformers_model)
+            # SentenceTransformer(sentence_transformers_model)
             self.tokenizer = None,
 
         self.source_embedding_dimension = self.sentence_transformer.get_sentence_embedding_dimension()
         self.source_sent_len = source_sent_len # unused so far 
         self.target_sent_len = target_sent_len # unused so far
         self.target_vocab = load_vocab(summary_vocab_path)
+
+
+
+    def load_sentence_transformers_model(self, model_name):
+    
+        """If model has already been downloaded, load the model from a cache.
+            Else, download it from the sentence transformers website and save it to the cache.
+
+            Note, the latter will not work in a batch job on Jade. 
+            """        
+
+        if not op.exists("models_cache"):
+            os.mkdir("models_cache")
+        
+        cache_path = op.join("models_cache", model_name)
+        
+        if op.exists(cache_path):
+            model = SentenceTransformer(cache_path)
+        else:
+            model = SentenceTransformer(model_name) 
+            model.save(cache_path)
+        
+        return model
+
 
     def __len__(self):
         """returns the length of dataframe"""
@@ -78,6 +107,6 @@ class SummaryDataset(Dataset):
 
 
         return {
-            "source": source.to(dtype=torch.float),
-            "target": target.to(dtype=torch.float),
+            "source": source.to(dtype=torch.float).to(device),
+            "target": target.to(dtype=torch.float).to(device),
         }
