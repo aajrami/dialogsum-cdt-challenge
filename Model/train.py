@@ -12,6 +12,7 @@ import json
 import torch
 import torch.nn as nn
 from torch import optim
+from torch.utils.data import DataLoader
 import torch.nn.functional as F
 
 import matplotlib.pyplot as plt
@@ -146,6 +147,9 @@ def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, deco
             batch_decoder_input = output_tensor[:,di].to(torch.long).unsqueeze(1)  # Teacher forcing
 
     else:
+
+        eos_list = [False] * batch_size
+
         # Without teacher forcing: use its own predictions as the next input
         for di in range(output_length):
             batch_decoder_output, batch_decoder_hidden, decoder_attention = decoder(
@@ -154,7 +158,10 @@ def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, deco
             decoder_input = topi.squeeze().detach()  # detach from history as input
 
             loss += criterion(batch_decoder_output, output_tensor[:,di].to(torch.long))
-            if decoder_input.item() == EOS_token:
+            for i, inp in enumerate(decoder_input):
+                if inp.item() == EOS_token:
+                    eos_list[i] = True
+            if len(eos_list) == sum(eos_list): #If we have seen EOS for every item in the batch, then we break
                 break
 
     loss.backward()
@@ -165,6 +172,34 @@ def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, deco
     return loss.item() / output_length
 
 
+def collate_function(batch):
+    
+    dialogue_batch   = [s["source"] for s in batch]
+    summary_batch = [s["target"] for s in batch]    
+
+    dialogue_lengths = torch.tensor([ len(dialogue) for dialogue in dialogue_batch ]).to(device)
+    summary_lengths = torch.tensor([ len(summary) for summary in summary_batch ]).to(device)
+    
+
+    dialogues_padded =   [   torch.stack([torch.ones_like(dialogue_batch[0][0])]   * max(dialogue_lengths)) for dialogue in dialogue_batch]
+    summaries_padded  =   [ torch.tensor([1] * max(summary_lengths)) for summary in summary_batch]
+
+    dialogues_padded  = torch.stack(dialogues_padded).to(device)
+    summaries_padded = torch.stack(summaries_padded).to(device)
+    
+    dialogues_padded *= 3   #We set the pad symbol to 3, same as in the vocab
+    summaries_padded *= 3
+    
+    for i, dialogue in enumerate(dialogue_batch):
+        dialogues_padded[i][:len(dialogue)] = dialogue
+    
+    for i, summary in enumerate(summary_batch):
+        summaries_padded[i][:len(summary)] = summary
+    
+    return { "source": dialogues_padded, "target": summaries_padded}
+
+
+
 def trainIters(encoder, decoder, train_dataset, num_epochs, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False):
     start = time.time()
     plot_losses = []
@@ -173,31 +208,30 @@ def trainIters(encoder, decoder, train_dataset, num_epochs, batch_size=1, print_
 
     encoder_optimizer = optim.Adam(encoder.parameters(), lr=learning_rate)
     decoder_optimizer = optim.Adam(decoder.parameters(), lr=learning_rate)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(ignore_index=3)
 
-    order = np.arange(len(train_dataset))
-    np.random.shuffle(order)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_function)
+
     for epoch in range(1, num_epochs+1):
-        for iter, i in enumerate(order):
+        print(f"starting epoch {epoch}")
+    
+        for iter, training_batch in enumerate(train_loader):
 
-            training_pair = train_dataset[i]
-            input_tensor = training_pair['source'].unsqueeze(0)
-            output_tensor = training_pair['target'].unsqueeze(0)
-            # batch_size=2
-            # input_tensor = torch.cat([input_tensor, input_tensor], dim=0)
-            # output_tensor = torch.cat([output_tensor, output_tensor], dim=0)
+            input_tensor = training_batch['source']
+            output_tensor = training_batch['target']
 
             loss = train(input_tensor, output_tensor, encoder,
                         decoder, encoder_optimizer, decoder_optimizer, 
                         criterion, batch_size=batch_size, debug=debug)
+            
             print_loss_total += loss
             plot_loss_total += loss
 
             if iter % print_every == 0:
                 print_loss_avg = print_loss_total / print_every
                 print_loss_total = 0
-                print('%s (%d %d%%) %.4f' % (timeSince(start, epoch*len(order) + iter / (epoch*len(order))),
-                                            epoch*len(order) + iter, iter / (epoch*len(order)) * 100, print_loss_avg))
+                print('%s (%d %d%%) %.4f' % (timeSince(start, epoch*len(train_dataset) + iter / (epoch*len(train_dataset))),
+                                            epoch*len(train_dataset) + iter, iter / (epoch*len(train_dataset)) * 100, print_loss_avg))
 
             if iter % plot_every == 0:
                 plot_loss_avg = plot_loss_total / plot_every
@@ -252,4 +286,4 @@ if __name__=="__main__":
     print(summary_vcb.n_words)
     encoder = EncoderRNN(sent_embedding_size, hidden_size).to(device)
     attn_decoder = AttnDecoderRNN(hidden_size, summary_vcb.n_words, dropout_p=0.1, max_length=MAX_LENGTH).to(device)
-    trainIters(encoder, attn_decoder, train_dataset, batch_size=1, num_epochs=num_epochs, print_every=500, debug=False)
+    trainIters(encoder, attn_decoder, train_dataset, batch_size=4, num_epochs=num_epochs, print_every=500, debug=False)

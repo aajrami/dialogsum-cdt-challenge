@@ -12,8 +12,8 @@ class Vocab:
         self.name = name
         self.word2index = {}
         self.word2count = {}
-        self.index2word = {0: "SOS", 1: "EOS", 2: "UNK"}
-        self.n_words = 3  # Count SOS and EOS and UNK
+        self.index2word = {0: "SOS", 1: "EOS", 2: "UNK", 3: "PAD"}
+        self.n_words = 4  # Count SOS and EOS and UNK and PAD
 
     def addSentence(self, sentence):
         for word in sentence.split(' '):

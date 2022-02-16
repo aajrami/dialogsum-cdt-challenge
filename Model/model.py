@@ -64,7 +64,9 @@ class AttnDecoderRNN(nn.Module):
 
         ####################################################
         # REPLACE WITH WORD2VEC LOOKUP
+        
         embedded = self.embedding(input)
+
 
         ####################################################
         if debug: print(f'input word embedding: {embedded.shape}')
