@@ -19,23 +19,11 @@ import json
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 debug = False
 
-word_embedding_size = 300
-
 summary_vcb = load_vocab('DialogSum_Data/summary.vcb')
 
-# FastText embedding
-train_path = 'DialogSum_Data/dialogsum.train.tok.jsonl'
-dialogues = []
-summaries = []
 
-with open(train_path, 'rb') as f:
-    for line in f:
-        d = json.loads(line)
-        dialogues.append(d['dialogue'])
-        summaries.append(d['summary'])
 
-summaries_sentences = [d.split(' ') for d in summaries ]
-fast_text_model = FastText(sentences=summaries_sentences, vector_size=word_embedding_size, window=3, min_count=1, epochs=10)
+
 
 
 # input size = sentence embedding size
@@ -70,12 +58,24 @@ class AttnDecoderRNN(nn.Module):
         self.dropout_p = dropout_p
         self.max_length = max_length
 
-        self.embedding = nn.Embedding(self.output_size, self.hidden_size)
         self.attn = nn.Linear(self.hidden_size * 2, self.max_length)
         self.attn_combine = nn.Linear(self.hidden_size * 2, self.hidden_size)
         self.dropout = nn.Dropout(self.dropout_p)
         self.gru = nn.GRU(self.hidden_size, self.hidden_size, batch_first=True)
         self.out = nn.Linear(self.hidden_size, self.output_size)
+
+        # embedding matrix
+        self.embedding = nn.Embedding(self.output_size, self.hidden_size)
+        # FastText embedding
+        train_path = 'DialogSum_Data/dialogsum.train.tok.jsonl'
+        summaries = []
+        with open(train_path, 'rb') as f:
+            for line in f:
+                d = json.loads(line)
+                summaries.append(d['summary'])
+        summaries_sentences = [d.split(' ') for d in summaries ]
+        self.fast_text_embeddings = FastText(sentences=summaries_sentences, vector_size=hidden_size, window=3, min_count=1, epochs=10)
+
 
     def forward(self, input, hidden, encoder_hidden):
 
@@ -84,14 +84,11 @@ class AttnDecoderRNN(nn.Module):
         if debug: print(f'encoder_hidden {encoder_hidden.shape}')
 
         ####################################################
-        # REPLACE WITH WORD2VEC LOOKUP
-        
-        #embedded = self.embedding(input)
-
-        embedded = torch.tensor([fast_text_model.wv[summary_vcb.index2word.get(int(word), 2)] for word in input]).unsqueeze(1)
-        
-
+        # EMBEDDINGS - MATRIX OR LOOKUP
+        #embedded = self.embedding(input) # embedding matrix
+        embedded = torch.tensor([self.fast_text_embeddings.wv[summary_vcb.index2word.get(int(word), 2)] for word in input]).unsqueeze(1)
         ####################################################
+
         if debug: print(f'input word embedding: {embedded.shape}')
 
         embedded = self.dropout(embedded)
