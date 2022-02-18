@@ -18,12 +18,7 @@ import json
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 debug = False
-
 summary_vcb = load_vocab('DialogSum_Data/summary.vcb')
-
-
-
-
 
 
 # input size = sentence embedding size

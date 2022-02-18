@@ -411,7 +411,7 @@ if __name__=="__main__":
     vocab_size = len(summary_vcb.index2word)
 
     # Create Dataset clas
-    train_data_list = load_jsonl(SAMPLE_DATA)
+    train_data_list = load_jsonl(TRAIN_DATA)
     
     if args.DEBUG_ON_SAMPLE:
         train_data_list = train_data_list[:100]
@@ -421,7 +421,7 @@ if __name__=="__main__":
                                     sentence_transformers_model="all-MiniLM-L6-v2",
                                     debug=False)
 
-    dev_data_list = load_jsonl(SAMPLE_DATA)
+    dev_data_list = load_jsonl(DEV_DATA)
     dev_dataset = SummaryDataset(dev_data_list,
                                 sentence_transformers_model="all-MiniLM-L6-v2",
                                 debug=False)
@@ -437,8 +437,6 @@ if __name__=="__main__":
     hidden_size = 300
     num_epochs = args.N_EPOCHS
 
-
-    print(summary_vcb.n_words)
     encoder = EncoderRNN(sent_embedding_size, hidden_size).to(device)
     attn_decoder = AttnDecoderRNN(hidden_size, summary_vcb.n_words, dropout_p=0.1, max_length=MAX_LENGTH).to(device)
 
