@@ -342,7 +342,9 @@ def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, num_ep
 
 
 
-def trainIters(encoder, decoder, train_dataset, dev_dataset, num_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False, experiment_name=args.EXPERIMENT_NAME):
+def trainIters(encoder, decoder, train_dataset, dev_dataset, num_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False, experiment_name=args.EXPERIMENT_NAME, patience = 5, early_stopping=True):
+    if early_stopping == False:
+        patience = float("inf")
     start = time.time()
     train_losses = []
     dev_losses = []
@@ -356,6 +358,11 @@ def trainIters(encoder, decoder, train_dataset, dev_dataset, num_epochs, vocab=N
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_function)
 
     os.makedirs(op.join("experiments", experiment_name), exist_ok=True)
+
+
+
+    current_patience = patience
+    
 
     for epoch in range(1, num_epochs+1):
         print(f"starting epoch {epoch}")
@@ -384,6 +391,13 @@ def trainIters(encoder, decoder, train_dataset, dev_dataset, num_epochs, vocab=N
         print('{} . Epoch {:2d}: train_loss: {:.4f} : dev_loss: {:.4f}'.format(timeSince(start, epoch/num_epochs+1), epoch, train_loss_avg, dev_loss_avg))
         train_loss_total = 0
 
+        if not dev_loss_avg < min(dev_losses):
+            current_patience -= 1
+        else:
+            current_patience = patience  #reset
+
+        if patience == 0:
+            break
 
     showPlot(train_losses, dev_losses)
 
