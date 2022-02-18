@@ -1,3 +1,3 @@
 #!/bin/bash 
 
-python Model/train.py --DEBUG_ON_SAMPLE
+python scripts/train.py --DEBUG_ON_SAMPLE
