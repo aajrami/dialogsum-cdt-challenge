@@ -1,4 +1,3 @@
 #!/bin/bash 
-echo "we ar e running scrip"
 
-python Model/train.py
+python Model/train.py --EXPERIMENT_NAME "preliminary_test" --N_EPOCHS 5

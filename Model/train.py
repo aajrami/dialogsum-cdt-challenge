@@ -6,6 +6,7 @@ import argparse
 import copy
 import time
 import math
+import os
 import os.path as op
 import random
 import json
@@ -25,6 +26,7 @@ import pandas as pd
 parser = argparse.ArgumentParser()
 parser.add_argument("--DEBUG_ON_SAMPLE", action="store_true")
 parser.add_argument("--EXPERIMENT_NAME", type=str, default="prelim")
+parser.add_argument("--N_EPOCHS", type=int, default=5)
 
 args = parser.parse_args()
 
@@ -236,7 +238,6 @@ def get_all_predictions(encoder, decoder, vocab, dataset, batch_size=4):
         gold_summaries = [dev_dataset[idx.item()]["summary_text"] for idx in dataset_indices]
         for i in range(len(dataset_indices)):
             pred_dict = {}
-            pred_dict["idx"] = dataset_indices[i]
             pred_dict["dialogue"] = dialogues[i]
             pred_dict["gold_summary"] = gold_summaries[i]
             pred_dict["predicted_summary"] = pred_summaries[i]
@@ -250,7 +251,7 @@ def get_all_predictions(encoder, decoder, vocab, dataset, batch_size=4):
 
 
 
-def trainIters(encoder, decoder, train_dataset, num_epochs, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False):
+def trainIters(encoder, decoder, train_dataset, dev_dataset, num_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False, experiment_name=args.EXPERIMENT_NAME):
     start = time.time()
     plot_losses = []
     print_loss_total = 0  # Reset every print_every
@@ -261,6 +262,8 @@ def trainIters(encoder, decoder, train_dataset, num_epochs, batch_size=1, print_
     criterion = nn.CrossEntropyLoss(ignore_index=3)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_function)
+
+    os.makedirs(op.join("experiments", experiment_name), exist_ok=True)
 
     for epoch in range(1, num_epochs+1):
         print(f"starting epoch {epoch}")
@@ -288,6 +291,8 @@ def trainIters(encoder, decoder, train_dataset, num_epochs, batch_size=1, print_
                 plot_losses.append(plot_loss_avg)
                 plot_loss_total = 0
 
+        predictions_df = get_all_predictions(encoder, attn_decoder, vocab, dev_dataset)
+        predictions_df.to_csv(op.join("experiments", experiment_name, f"{epoch}_epochs.csv"))
 
     showPlot(plot_losses)
 
@@ -336,7 +341,7 @@ if __name__=="__main__":
     batch_size=4
 
     hidden_size = 300
-    num_epochs = 0
+    num_epochs = args.N_EPOCHS
 
 
     print(summary_vcb.n_words)
@@ -346,7 +351,7 @@ if __name__=="__main__":
     orig_encoder = copy.deepcopy(encoder)
     orig_decoder = copy.deepcopy(attn_decoder)
 
-    trainIters(encoder, attn_decoder, train_dataset, batch_size=batch_size, num_epochs=num_epochs, print_every=500, debug=False)
+    trainIters(encoder, attn_decoder, train_dataset, dev_dataset, num_epochs=num_epochs, vocab=summary_vcb, batch_size=batch_size, print_every=500, debug=False)
 
     assert encoder != orig_encoder #sanity check
     assert attn_decoder != orig_decoder
