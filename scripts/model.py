@@ -74,6 +74,8 @@ class AttnDecoderRNN(nn.Module):
 
     def forward(self, input, hidden, encoder_hidden):
 
+        debug = True
+    
         if debug: print(f'input: {input.shape}')
         if debug: print(f'hidden: {hidden.shape}')
         if debug: print(f'encoder_hidden {encoder_hidden.shape}')
@@ -81,13 +83,12 @@ class AttnDecoderRNN(nn.Module):
         ####################################################
         # EMBEDDINGS - MATRIX OR LOOKUP
         #embedded = self.embedding(input) # embedding matrix
-        embedded = torch.tensor(np.array([self.fast_text_embeddings.wv[summary_vcb.index2word.get(int(word), 2)] for word in input])).unsqueeze(1)
+        embedded = torch.stack([torch.tensor([self.fast_text_embeddings.wv[summary_vcb.index2word.get(int(word), 2)]]) for word in input])
         ####################################################
 
         embedded = embedded.to(device)
 
         if debug: print(f'input word embedding: {embedded.shape}')
-
         embedded = self.dropout(embedded)
 
         if debug: print(f'embedded[:,0] : {embedded[:,0].shape}')
@@ -95,6 +96,7 @@ class AttnDecoderRNN(nn.Module):
         if debug: print(f'torch.cat((embedded[:,0], hidden[:,0]), 1) : {torch.cat((embedded[:,0], hidden[0]), 1).shape}')
         if debug: print(f'self.attn : {self.attn}')
 
+ 
         attn_weights = F.softmax(
             self.attn(torch.cat((embedded[:,0], hidden[0]), 1)), dim=1).unsqueeze(1)
         

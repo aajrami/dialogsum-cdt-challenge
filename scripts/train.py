@@ -9,6 +9,7 @@ import math
 import os
 import os.path as op
 import random
+import sys
 import json
 
 import torch
@@ -60,7 +61,7 @@ def timeSince(since, percent):
     return '%s (- %s)' % (asMinutes(s), asMinutes(rs))
 
 ## TRAINING FUNCTIONS
-def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, batch_size=1, max_length=max_length, debug=False):
+def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, batch_size=1, max_length=50, debug=False):
     
     batch_encoder_hidden = torch.cat(batch_size * [encoder.initHidden()], dim=1)
     
@@ -125,7 +126,7 @@ def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, deco
 
 
 # Decodes a batch
-def decode(input_tensor, output_tensor, encoder, decoder, criterion, vocab, batch_size=1, max_length=max_length, debug=False):
+def decode(input_tensor, output_tensor, encoder, decoder, criterion, vocab, batch_size=1, max_length=50, debug=False):
     
     loss = 0
 
@@ -212,7 +213,7 @@ def collate_function(batch):
 
 
 
-def get_all_predictions(encoder, decoder, vocab, criterion, dataset, batch_size=4):
+def get_all_predictions(encoder, decoder, vocab, criterion, dataset, batch_size=4, max_length=50):
 
     dev_loss = 0
 
@@ -224,7 +225,7 @@ def get_all_predictions(encoder, decoder, vocab, criterion, dataset, batch_size=
         dataset_indices = batch["dataset_index"]
         input_tensor = batch["source"]
         output_tensor = batch["target"]
-        outputs, loss = decode(input_tensor, output_tensor, encoder, decoder, criterion, vocab, batch_size=batch_size)
+        outputs, loss = decode(input_tensor, output_tensor, encoder, decoder, criterion, vocab, batch_size=batch_size, max_length=max_length)
         pred_summaries = [" ".join(decoded_sent) for decoded_sent in outputs]
         dev_loss += loss
 
@@ -330,7 +331,7 @@ def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, max_ep
 
 
 
-def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False, patience = 5, early_stopping=True):
+def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False, patience = 5, early_stopping=True, teacher_forcing_ratio=0.5, max_length=50):
     if not early_stopping:
         patience = float("inf")
 
@@ -367,7 +368,7 @@ def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=N
             plot_loss_total += loss
 
         # Validate at the end of each epoch
-        predictions_df, dev_loss_total = get_all_predictions(encoder, attn_decoder, vocab, criterion, dev_dataset)
+        predictions_df, dev_loss_total = get_all_predictions(encoder, attn_decoder, vocab, criterion, dev_dataset, max_length=max_length)
         predictions_df.to_csv(op.join("experiments", experiment_name, f"{epoch}_epochs.csv"))
 
         train_loss_avg = train_loss_total / len(train_dataset)
@@ -405,8 +406,12 @@ def showPlot(train_points, dev_points):
 
 
 if __name__=="__main__":
+
+    params_fp = sys.argv[1]
+   
     
-    params = json.load('params.json')
+    with open(params_fp, "r") as params_file:
+        params = json.load(params_file)
     experiment_name         = params['experiment_name']
     experiment_id           = params['experiment_id']
     debug                   = params['debug']
@@ -452,12 +457,14 @@ if __name__=="__main__":
     orig_decoder = copy.deepcopy(attn_decoder)
 
     if sanity_check:
+        print("doing sanity check")
         trainIters_sanity_check(encoder, attn_decoder, train_dataset, dev_dataset, max_epochs=max_epochs, vocab=summary_vcb, batch_size=batch_size, print_every=500, debug=debug)
         exit(0)
 
     trainIters(encoder, attn_decoder, train_dataset, dev_dataset, max_epochs=max_epochs, 
                 teacher_forcing_ratio=teacher_forcing_ratio, vocab=summary_vcb, 
-                batch_size=batch_size, learning_rate=learning_rate
+                batch_size=batch_size, learning_rate=learning_rate,
+                patience=patience, early_stopping=early_stopping,
                 print_every=500, debug=debug)
 
     assert encoder != orig_encoder #sanity check
