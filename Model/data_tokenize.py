@@ -32,8 +32,8 @@ def multiword_tokenize(text, mwe):
 
 if __name__=="__main__":
     # tok
-    with open('DialogSum_Data/dialogsum.sample.jsonl', "r") as f1:
-        with open('DialogSum_Data/dialogsum.sample.tok.jsonl', "w+") as f2:
+    with open('DialogSum_Data/dialogsum.dev.jsonl', "r") as f1:
+        with open('DialogSum_Data/dialogsum.dev.tok.jsonl', "w+") as f2:
             for line in f1:
                 d = json.loads(line)
                 dialogue = d['dialogue']
