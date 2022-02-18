@@ -330,7 +330,10 @@ def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, max_ep
 
 
 
-def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False):
+def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False, patience = 5, early_stopping=True):
+    if not early_stopping:
+        patience = float("inf")
+
     start = time.time()
     train_losses = []
     dev_losses = []
@@ -344,6 +347,9 @@ def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=N
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_function)
 
     os.makedirs(op.join("experiments", experiment_name), exist_ok=True)
+
+    current_patience = patience
+
 
     for epoch in range(1, max_epochs+1):
         print(f"starting epoch {epoch}")
@@ -377,7 +383,7 @@ def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=N
         else:
             current_patience = patience  #reset
 
-        if patience == 0:
+        if current_patience == 0:
             break
 
     showPlot(train_losses, dev_losses)
