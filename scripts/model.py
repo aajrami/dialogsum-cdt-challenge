@@ -81,8 +81,10 @@ class AttnDecoderRNN(nn.Module):
         ####################################################
         # EMBEDDINGS - MATRIX OR LOOKUP
         #embedded = self.embedding(input) # embedding matrix
-        embedded = torch.tensor([self.fast_text_embeddings.wv[summary_vcb.index2word.get(int(word), 2)] for word in input]).unsqueeze(1)
+        embedded = torch.tensor(np.array([self.fast_text_embeddings.wv[summary_vcb.index2word.get(int(word), 2)] for word in input])).unsqueeze(1)
         ####################################################
+
+        embedded = embedded.to(device)
 
         if debug: print(f'input word embedding: {embedded.shape}')
 

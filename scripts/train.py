@@ -372,6 +372,13 @@ def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=N
         print('{} . Epoch {:2d}: train_loss: {:.4f} : dev_loss: {:.4f}'.format(timeSince(start, epoch/max_epochs+1), epoch, train_loss_avg, dev_loss_avg))
         train_loss_total = 0
 
+        if not dev_loss_avg < min(dev_losses):
+            current_patience -= 1
+        else:
+            current_patience = patience  #reset
+
+        if patience == 0:
+            break
 
     showPlot(train_losses, dev_losses)
 
