@@ -445,7 +445,7 @@ if __name__=="__main__":
 
     if args.SANITY_CHECK:
         trainIters_sanity_check(encoder, attn_decoder, train_dataset, dev_dataset, num_epochs=num_epochs, vocab=summary_vcb, batch_size=batch_size, print_every=500, debug=False)
-        exit(1)
+        exit(0)
 
     trainIters(encoder, attn_decoder, train_dataset, dev_dataset, num_epochs=num_epochs, vocab=summary_vcb, batch_size=batch_size, print_every=500, debug=False)
 
