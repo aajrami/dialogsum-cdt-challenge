@@ -11,6 +11,7 @@ import os.path as op
 import random
 import sys
 import json
+import shutil
 
 import torch
 import torch.nn as nn
@@ -379,6 +380,17 @@ def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=N
         print('{} . Epoch {:2d}: train_loss: {:.4f} : dev_loss: {:.4f}'.format(timeSince(start, epoch/max_epochs+1), epoch, train_loss_avg, dev_loss_avg))
         train_loss_total = 0
 
+        # save model: encoder and decoder
+        if not os.path.exists('tmp/encoder'):
+            os.makedirs('tmp/encoder')
+
+        if not os.path.exists('tmp/decoder'):
+            os.makedirs('tmp/decoder')
+
+        torch.save(encoder.state_dict(), f'tmp/encoder/{epoch}')
+        torch.save(decoder.state_dict(), f'tmp/decoder/{epoch}')
+
+
         if not dev_loss_avg < min(dev_losses):
             current_patience -= 1
         else:
@@ -386,6 +398,26 @@ def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=N
 
         if current_patience == 0:
             break
+
+    # keep the best model and delete tmp
+    if not os.path.exists('saved_model/encoder'):
+            os.makedirs('saved_model/encoder')
+    if not os.path.exists('saved_model/decoder'):
+            os.makedirs('saved_model/decoder')
+    
+    # index of best model
+    idx  = dev_losses.index(min(dev_losses)) + 1
+    # remove old files if exist
+    if os.path.exists(f'saved_model/encoder/{idx}'):
+        os.remove(f'saved_model/encoder/{idx}')
+    if os.path.exists(f'saved_model/decoder/{idx}'):
+        os.remove(f'saved_model/decoder/{idx}')
+    # move the best model from tmp to saved_model
+    print(f'Saving the best model from epoch {idx} ...')
+    shutil.move(f'tmp/encoder/{idx}', 'saved_model/encoder')
+    shutil.move(f'tmp/decoder/{idx}', 'saved_model/decoder')
+    # remove tmp folder
+    shutil.rmtree('tmp')
 
     showPlot(train_losses, dev_losses)
 
