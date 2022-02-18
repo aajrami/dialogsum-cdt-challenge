@@ -107,6 +107,9 @@ class SummaryDataset(Dataset):
 
 
         return {
+            "dialogue_text": source_text,
+            "summary_text": target_text,
             "source": source.to(dtype=torch.float).to(device),
             "target": target.to(dtype=torch.float).to(device),
+            "index": index
         }

@@ -20,9 +20,11 @@ import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 import matplotlib.ticker as ticker
 import numpy as np
+import pandas as pd
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--DEBUG_ON_SAMPLE", action="store_true")
+parser.add_argument("--EXPERIMENT_NAME", type=str, default="prelim")
 
 args = parser.parse_args()
 
@@ -176,8 +178,6 @@ def decode(input_tensor, encoder, decoder, vocab, batch_size=1, max_length=MAX_L
 
         outputs.append(topi)
 
-        print(outputs)
-        #import pdb; pdb.set_trace()
         
         for i, inp in enumerate(decoder_input):
             if inp.item() == EOS_token:
@@ -194,6 +194,7 @@ def decode(input_tensor, encoder, decoder, vocab, batch_size=1, max_length=MAX_L
 
 def collate_function(batch):
     
+    dataset_index = torch.tensor([s["index"] for s in batch]) #To let us find the original text of dialogue and summary
     dialogue_batch   = [s["source"] for s in batch]
     summary_batch = [s["target"] for s in batch]    
 
@@ -216,7 +217,36 @@ def collate_function(batch):
     for i, summary in enumerate(summary_batch):
         summaries_padded[i][:len(summary)] = summary
     
-    return { "source": dialogues_padded, "target": summaries_padded}
+    return { "source": dialogues_padded, "target": summaries_padded, "dataset_index": dataset_index}
+
+
+
+def get_all_predictions(encoder, decoder, vocab, dataset, batch_size=4):
+
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_function)
+
+    predictions = []
+
+    for batch in dataloader:
+        dataset_indices = batch["dataset_index"]
+        input_tensor = batch["source"]
+        outputs = decode(input_tensor, encoder, decoder, vocab, batch_size=batch_size)
+        pred_summaries = [" ".join(decoded_sent) for decoded_sent in outputs]
+        dialogues = [dataset[idx.item()]["dialogue_text"] for idx in dataset_indices]
+        gold_summaries = [dev_dataset[idx.item()]["summary_text"] for idx in dataset_indices]
+        for i in range(len(dataset_indices)):
+            pred_dict = {}
+            pred_dict["idx"] = dataset_indices[i]
+            pred_dict["dialogue"] = dialogues[i]
+            pred_dict["gold_summary"] = gold_summaries[i]
+            pred_dict["predicted_summary"] = pred_summaries[i]
+            predictions.append(pred_dict)
+
+    predictions_df = pd.DataFrame(predictions)
+
+    return(predictions_df)
+
+
 
 
 
@@ -306,7 +336,7 @@ if __name__=="__main__":
     batch_size=4
 
     hidden_size = 300
-    num_epochs = 5
+    num_epochs = 0
 
 
     print(summary_vcb.n_words)
@@ -322,13 +352,9 @@ if __name__=="__main__":
     assert attn_decoder != orig_decoder
 
 
-    val_loader = DataLoader(dev_dataset, batch_size=4, shuffle=True, collate_fn=collate_function)
-    
-    training_batch = next(iter(val_loader)) 
-    input_tensor = training_batch['source']
 
-    outputs = decode(input_tensor, encoder, attn_decoder, summary_vcb, batch_size=batch_size)
-    print(outputs)
-    
+    predictions_df = get_all_predictions(encoder, attn_decoder, summary_vcb, dev_dataset)
+
+
     import pdb; pdb.set_trace()
 
