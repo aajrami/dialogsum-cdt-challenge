@@ -22,6 +22,7 @@ plt.switch_backend('agg')
 import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
+from gensim.models import FastText
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--DEBUG_ON_SAMPLE", action="store_true")
@@ -395,6 +396,7 @@ def showPlot(train_points, dev_points):
     x = range(1,len(train_points)+1)
     y1 = train_points
     y2 = dev_points
+    plt.ylim(0,2)
     plt.plot(x, y1, "-b", label="train")
     plt.plot(x, y2, "-r", label="dev")
     plt.legend(loc="upper right")
@@ -402,7 +404,7 @@ def showPlot(train_points, dev_points):
 
 
 if __name__=="__main__":
-
+    
     ##################################################################################
     dialogue_vcb = load_vocab('DialogSum_Data/dialogue.vcb')
     summary_vcb = load_vocab('DialogSum_Data/summary.vcb')
@@ -432,7 +434,7 @@ if __name__=="__main__":
 
     batch_size=args.BATCH_SIZE
 
-    hidden_size = 30
+    hidden_size = 300
     num_epochs = args.N_EPOCHS
 
 
@@ -452,8 +454,6 @@ if __name__=="__main__":
     assert encoder != orig_encoder #sanity check
     assert attn_decoder != orig_decoder
 
-
-    predictions_df = get_all_predictions(encoder, attn_decoder, summary_vcb, dev_dataset)
 
 
     # import pdb; pdb.set_trace()

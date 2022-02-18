@@ -12,10 +12,31 @@ import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 import matplotlib.ticker as ticker
 import numpy as np
+from gensim.models import FastText
+import json
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 debug = False
+
+word_embedding_size = 300
+
+summary_vcb = load_vocab('DialogSum_Data/summary.vcb')
+
+# FastText embedding
+train_path = 'DialogSum_Data/dialogsum.train.tok.jsonl'
+dialogues = []
+summaries = []
+
+with open(train_path, 'rb') as f:
+    for line in f:
+        d = json.loads(line)
+        dialogues.append(d['dialogue'])
+        summaries.append(d['summary'])
+
+summaries_sentences = [d.split(' ') for d in summaries ]
+fast_text_model = FastText(sentences=summaries_sentences, vector_size=word_embedding_size, window=3, min_count=1, epochs=10)
+
 
 # input size = sentence embedding size
 # hidden size = hyper-parameter
@@ -65,8 +86,10 @@ class AttnDecoderRNN(nn.Module):
         ####################################################
         # REPLACE WITH WORD2VEC LOOKUP
         
-        embedded = self.embedding(input)
+        #embedded = self.embedding(input)
 
+        embedded = torch.tensor([fast_text_model.wv[summary_vcb.index2word.get(int(word), 2)] for word in input]).unsqueeze(1)
+        
 
         ####################################################
         if debug: print(f'input word embedding: {embedded.shape}')
@@ -111,63 +134,3 @@ class AttnDecoderRNN(nn.Module):
     def initHidden(self):
         return torch.zeros(1, 1, self.hidden_size, device=device)
 
-if __name__=="__main__":
-    sent_embedding_size = 20
-
-    # MAKE THIS SAME AS WORD EMBEDDING SIZE FOR NOW
-    # IF WANT DIFFERENT REFACTOR DECODER INIT
-    hidden_size = 30
-
-    vocab_size = 100
-    num_sents = 5
-
-    sentence_embeddings = torch.rand((num_sents, sent_embedding_size))
-
-    encoder = EncoderRNN(sent_embedding_size, hidden_size)
-
-    ##################################################################################
-
-    summ_vcb = load_vocab('DialogSum_Data/summary.vcb')
-    output_size = summ_vcb.n_words
-
-    decoder = AttnDecoderRNN(hidden_size, output_size, dropout_p=0.1).to(device)
-    decoder_hidden = encoder_hidden
-
-
-
-    hidden_size = 256
-    encoder = EncoderRNN(input_lang.n_words, hidden_size).to(device)
-    attn_decoder = AttnDecoderRNN(hidden_size, output_lang.n_words, dropout_p=0.1).to(device)
-
-    trainIters(encoder, attn_decoder, 75000, print_every=5000)
-
-
-if __name__=="__main__":
-    sent_embedding_size = 20
-
-    # MAKE THIS SAME AS WORD EMBEDDING SIZE FOR NOW
-    # IF WANT DIFFERENT REFACTOR DECODER INIT
-    hidden_size = 30
-    vocab_size = 100
-    num_sents = 5
-
-    sentence_embeddings = torch.rand((num_sents, sent_embedding_size))
-
-    encoder = EncoderRNN(sent_embedding_size, hidden_size)
-
-    ##################################################################################
-
-    summ_vcb = load_vocab('DialogSum_Data/summary.vcb')
-    vocab_size = len(summ_vcb.index2word)
-    output_size = summ_vcb.n_words
-
-    decoder = AttnDecoderRNN(hidden_size, output_size, dropout_p=0.1).to(device)
-    decoder_hidden = encoder_hidden
-
-
-
-    hidden_size = 256
-    encoder = EncoderRNN(input_lang.n_words, hidden_size).to(device)
-    attn_decoder = AttnDecoderRNN(hidden_size, output_lang.n_words, dropout_p=0.1).to(device)
-
-    trainIters(encoder, attn_decoder, 75000, print_every=5000)
