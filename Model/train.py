@@ -27,6 +27,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--DEBUG_ON_SAMPLE", action="store_true")
 parser.add_argument("--EXPERIMENT_NAME", type=str, default="prelim")
 parser.add_argument("--N_EPOCHS", type=int, default=5)
+parser.add_argument("--SANITY_CHECK", action="store_true")
 
 args = parser.parse_args()
 
@@ -250,6 +251,56 @@ def get_all_predictions(encoder, decoder, vocab, dataset, batch_size=4):
     return(predictions_df), dev_loss
 
 
+def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, num_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False, experiment_name=args.EXPERIMENT_NAME):
+    start = time.time()
+    plot_losses = []
+    print_loss_total = 0  # Reset every print_every
+    plot_loss_total = 0  # Reset every plot_every
+
+    encoder_optimizer = optim.Adam(encoder.parameters(), lr=learning_rate)
+    decoder_optimizer = optim.Adam(decoder.parameters(), lr=learning_rate)
+    criterion = nn.CrossEntropyLoss(ignore_index=3)
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_function)
+
+    os.makedirs(op.join("experiments", experiment_name), exist_ok=True)
+
+    for epoch in range(1, num_epochs+1):
+        print(f"starting epoch {epoch}")
+    
+        training_batches = train_loader.__iter__()
+        batch_0 = next(training_batches)
+
+        for iter, _ in enumerate(train_loader):
+
+            training_batch = batch_0
+    
+            input_tensor = training_batch['source']
+            output_tensor = training_batch['target']
+
+            loss = train(input_tensor, output_tensor, encoder,
+                        decoder, encoder_optimizer, decoder_optimizer, 
+                        criterion, batch_size=batch_size, debug=debug)
+            
+            print_loss_total += loss
+            plot_loss_total += loss
+
+            if iter % print_every == 0:
+                print_loss_avg = print_loss_total / print_every
+                print_loss_total = 0
+                print('%s (%d %d%%) %.4f' % (timeSince(start, epoch*len(train_dataset) + iter / (epoch*len(train_dataset))),
+                                            epoch*len(train_dataset) + iter, iter / (epoch*len(train_dataset)) * 100, print_loss_avg))
+
+            if iter % plot_every == 0:
+                plot_loss_avg = plot_loss_total / plot_every
+                plot_losses.append(plot_loss_avg)
+                plot_loss_total = 0
+
+        predictions_df = get_all_predictions(encoder, attn_decoder, vocab, train_dataset)
+        predictions_df.to_csv(op.join("experiments", experiment_name, f"{epoch}_epochs.csv"))
+
+    showPlot(plot_losses)
+
 
 
 
@@ -353,7 +404,7 @@ if __name__=="__main__":
 
     batch_size=4
 
-    hidden_size = 300
+    hidden_size = 50
     num_epochs = args.N_EPOCHS
 
 
@@ -364,11 +415,14 @@ if __name__=="__main__":
     orig_encoder = copy.deepcopy(encoder)
     orig_decoder = copy.deepcopy(attn_decoder)
 
+    if args.SANITY_CHECK:
+        trainIters_sanity_check(encoder, attn_decoder, train_dataset, dev_dataset, num_epochs=num_epochs, vocab=summary_vcb, batch_size=batch_size, print_every=500, debug=False)
+        exit(1)
+
     trainIters(encoder, attn_decoder, train_dataset, dev_dataset, num_epochs=num_epochs, vocab=summary_vcb, batch_size=batch_size, print_every=500, debug=False)
 
     assert encoder != orig_encoder #sanity check
     assert attn_decoder != orig_decoder
-
 
 
     predictions_df = get_all_predictions(encoder, attn_decoder, summary_vcb, dev_dataset)
