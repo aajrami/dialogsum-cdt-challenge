@@ -176,6 +176,9 @@ def decode(input_tensor, encoder, decoder, vocab, batch_size=1, max_length=MAX_L
 
         outputs.append(topi)
 
+        print(outputs)
+        #import pdb; pdb.set_trace()
+        
         for i, inp in enumerate(decoder_input):
             if inp.item() == EOS_token:
                 eos_list[i] = True
@@ -184,6 +187,7 @@ def decode(input_tensor, encoder, decoder, vocab, batch_size=1, max_length=MAX_L
 
     outputs = torch.stack(outputs).swapaxes(0, 1)
     output_sentence = [tensor_to_sentence(outputs[i], vocab) for i in range(len(outputs))]
+    
 
     return output_sentence
 
@@ -258,6 +262,7 @@ def trainIters(encoder, decoder, train_dataset, num_epochs, batch_size=1, print_
     showPlot(plot_losses)
 
 
+
 ## PLOTTING FUNCTIONS
 def showPlot(points):
     plt.figure()
@@ -300,8 +305,8 @@ if __name__=="__main__":
 
     batch_size=4
 
-    hidden_size = 3
-    num_epochs = 1
+    hidden_size = 300
+    num_epochs = 5
 
 
     print(summary_vcb.n_words)
@@ -323,6 +328,7 @@ if __name__=="__main__":
     input_tensor = training_batch['source']
 
     outputs = decode(input_tensor, encoder, attn_decoder, summary_vcb, batch_size=batch_size)
-
+    print(outputs)
+    
     import pdb; pdb.set_trace()
 

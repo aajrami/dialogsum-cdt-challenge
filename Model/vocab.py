@@ -40,7 +40,7 @@ def sentence_to_tensor(sent, vocab):
     return tensor
 
 def tensor_to_sentence(tensor, vocab):
-    sent = [vocab.index2word.get(i, "UNK") for i in tensor]
+    sent = [vocab.index2word.get(int(i), "UNK") for i in tensor]
     return sent
 
 def load_vocab(filepath):
