@@ -28,6 +28,7 @@ parser.add_argument("--DEBUG_ON_SAMPLE", action="store_true")
 parser.add_argument("--EXPERIMENT_NAME", type=str, default="prelim")
 parser.add_argument("--N_EPOCHS", type=int, default=5)
 parser.add_argument("--SANITY_CHECK", action="store_true")
+parser.add_argument("--BATCH_SIZE", type=int, default=4)
 
 args = parser.parse_args()
 
@@ -240,7 +241,7 @@ def get_all_predictions(encoder, decoder, vocab, criterion, dataset, batch_size=
         dev_loss += loss
 
         dialogues = [dataset[idx.item()]["dialogue_text"] for idx in dataset_indices]
-        gold_summaries = [dev_dataset[idx.item()]["summary_text"] for idx in dataset_indices]
+        gold_summaries = [dataset[idx.item()]["summary_text"] for idx in dataset_indices]
         for i in range(len(dataset_indices)):
             pred_dict = {}
             pred_dict["dialogue"] = dialogues[i]
@@ -251,6 +252,92 @@ def get_all_predictions(encoder, decoder, vocab, criterion, dataset, batch_size=
     predictions_df = pd.DataFrame(predictions)
 
     return(predictions_df), dev_loss
+
+
+def get_all_predictions_sanity_check(encoder, decoder, vocab, dataset, batch_size=4):
+
+    dev_loss = 0
+
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_function)
+
+    predictions = []
+
+    batches = dataloader.__iter__()
+    batch = next(batches)
+    
+    for _ in dataloader:
+
+        dataset_indices = batch["dataset_index"]
+        input_tensor = batch["source"]
+        outputs = decode(input_tensor, encoder, decoder, vocab, batch_size=batch_size)
+        pred_summaries = [" ".join(decoded_sent) for decoded_sent in outputs]
+        dialogues = [dataset[idx.item()]["dialogue_text"] for idx in dataset_indices]
+        gold_summaries = [dataset[idx.item()]["summary_text"] for idx in dataset_indices]
+        for i in range(len(dataset_indices)):
+            pred_dict = {}
+            pred_dict["dialogue"] = dialogues[i]
+            pred_dict["gold_summary"] = gold_summaries[i]
+            pred_dict["predicted_summary"] = pred_summaries[i]
+            predictions.append(pred_dict)
+
+    predictions_df = pd.DataFrame(predictions)
+
+    return(predictions_df), dev_loss
+
+
+
+
+def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, num_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False, experiment_name=args.EXPERIMENT_NAME):
+    start = time.time()
+    plot_losses = []
+    print_loss_total = 0  # Reset every print_every
+    plot_loss_total = 0  # Reset every plot_every
+
+    encoder_optimizer = optim.Adam(encoder.parameters(), lr=learning_rate)
+    decoder_optimizer = optim.Adam(decoder.parameters(), lr=learning_rate)
+    criterion = nn.CrossEntropyLoss(ignore_index=3)
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_function)
+
+    os.makedirs(op.join("experiments", experiment_name), exist_ok=True)
+
+    for epoch in range(1, num_epochs+1):
+        print(f"starting epoch {epoch}")
+    
+
+        training_batches = train_loader.__iter__()
+        batch_0 = next(training_batches)
+
+        for iter, _ in enumerate(train_loader):
+            print(f"training batch {iter} of {len(train_loader)}")
+            training_batch = batch_0
+    
+            input_tensor = training_batch['source']
+            output_tensor = training_batch['target']
+
+            loss = train(input_tensor, output_tensor, encoder,
+                        decoder, encoder_optimizer, decoder_optimizer, 
+                        criterion, batch_size=batch_size, debug=debug)
+            
+            print_loss_total += loss
+            plot_loss_total += loss
+
+            if iter % print_every == 0:
+                print_loss_avg = print_loss_total / print_every
+                print_loss_total = 0
+                print('%s (%d %d%%) %.4f' % (timeSince(start, epoch*len(train_dataset) + iter / (epoch*len(train_dataset))),
+                                            epoch*len(train_dataset) + iter, iter / (epoch*len(train_dataset)) * 100, print_loss_avg))
+
+            if iter % plot_every == 0:
+                plot_loss_avg = plot_loss_total / plot_every
+                plot_losses.append(plot_loss_avg)
+                plot_loss_total = 0
+
+        predictions_df, loss = get_all_predictions_sanity_check(encoder, attn_decoder, vocab, train_dataset, batch_size=batch_size)
+        predictions_df.to_csv(op.join("experiments", experiment_name, f"{epoch}_epochs.csv"))
+
+    showPlot(plot_losses)
+
 
 
 
@@ -322,7 +409,7 @@ if __name__=="__main__":
     vocab_size = len(summary_vcb.index2word)
 
     # Create Dataset clas
-    train_data_list = load_jsonl(SAMPLE_DATA)
+    train_data_list = load_jsonl(TRAIN_DATA)
     
     if args.DEBUG_ON_SAMPLE:
         train_data_list = train_data_list[:100]
@@ -343,7 +430,7 @@ if __name__=="__main__":
     # IF WANT DIFFERENT REFACTOR DECODER INIT
     sent_embedding_size = train_dataset.source_embedding_dimension
 
-    batch_size=4
+    batch_size=args.BATCH_SIZE
 
     hidden_size = 30
     num_epochs = args.N_EPOCHS
