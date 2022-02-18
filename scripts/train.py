@@ -24,21 +24,9 @@ import numpy as np
 import pandas as pd
 from gensim.models import FastText
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--DEBUG_ON_SAMPLE", action="store_true")
-parser.add_argument("--EXPERIMENT_NAME", type=str, default="prelim")
-parser.add_argument("--N_EPOCHS", type=int, default=5)
-parser.add_argument("--SANITY_CHECK", action="store_true")
-parser.add_argument("--BATCH_SIZE", type=int, default=4)
-
-args = parser.parse_args()
-
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 SOS_token = 0
 EOS_token = 1
-MAX_LENGTH = 100
-teacher_forcing_ratio = 0.5
 
 DATA_DIR = "DialogSum_Data"
 
@@ -73,7 +61,7 @@ def timeSince(since, percent):
     return '%s (- %s)' % (asMinutes(s), asMinutes(rs))
 
 ## TRAINING FUNCTIONS
-def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, batch_size=1, max_length=MAX_LENGTH, debug=False):
+def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, batch_size=1, max_length=max_length, debug=False):
     
     batch_encoder_hidden = torch.cat(batch_size * [encoder.initHidden()], dim=1)
     
@@ -138,7 +126,7 @@ def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, deco
 
 
 # Decodes a batch
-def decode(input_tensor, output_tensor, encoder, decoder, criterion, vocab, batch_size=1, max_length=MAX_LENGTH, debug=False):
+def decode(input_tensor, output_tensor, encoder, decoder, criterion, vocab, batch_size=1, max_length=max_length, debug=False):
     
     loss = 0
 
@@ -288,7 +276,7 @@ def get_all_predictions_sanity_check(encoder, decoder, vocab, dataset, batch_siz
 
 
 
-def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, num_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False, experiment_name=args.EXPERIMENT_NAME):
+def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False, experiment_name=args.EXPERIMENT_NAME):
     start = time.time()
     plot_losses = []
     print_loss_total = 0  # Reset every print_every
@@ -302,7 +290,7 @@ def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, num_ep
 
     os.makedirs(op.join("experiments", experiment_name), exist_ok=True)
 
-    for epoch in range(1, num_epochs+1):
+    for epoch in range(1, max_epochs+1):
         print(f"starting epoch {epoch}")
     
 
@@ -342,7 +330,7 @@ def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, num_ep
 
 
 
-def trainIters(encoder, decoder, train_dataset, dev_dataset, num_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False, experiment_name=args.EXPERIMENT_NAME):
+def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False, experiment_name=args.EXPERIMENT_NAME):
     start = time.time()
     train_losses = []
     dev_losses = []
@@ -357,7 +345,7 @@ def trainIters(encoder, decoder, train_dataset, dev_dataset, num_epochs, vocab=N
 
     os.makedirs(op.join("experiments", experiment_name), exist_ok=True)
 
-    for epoch in range(1, num_epochs+1):
+    for epoch in range(1, max_epochs+1):
         print(f"starting epoch {epoch}")
     
         for iter, training_batch in enumerate(train_loader):
@@ -381,7 +369,7 @@ def trainIters(encoder, decoder, train_dataset, dev_dataset, num_epochs, vocab=N
         dev_loss_avg = dev_loss_total / len(dev_dataset)
         dev_losses.append(dev_loss_avg)
 
-        print('{} . Epoch {:2d}: train_loss: {:.4f} : dev_loss: {:.4f}'.format(timeSince(start, epoch/num_epochs+1), epoch, train_loss_avg, dev_loss_avg))
+        print('{} . Epoch {:2d}: train_loss: {:.4f} : dev_loss: {:.4f}'.format(timeSince(start, epoch/max_epochs+1), epoch, train_loss_avg, dev_loss_avg))
         train_loss_total = 0
 
 
@@ -405,7 +393,22 @@ def showPlot(train_points, dev_points):
 
 if __name__=="__main__":
     
-    ##################################################################################
+    params = json.load('params.json')
+    experiment_name         = params['experiment_name']
+    experiment_id           = params['experiment_id']
+    debug                   = params['debug']
+    sanity_check            = params['sanity_check']
+    early_stopping          = params['early_stopping']
+    patience                = params['patience']
+    max_epochs              = params['max_epochs']
+    hidden_size             = params['hidden_size']
+    batch_size              = params['batch_size']
+    max_length              = params['max_length']
+    dropout                 = params['dropout']
+    teacher_forcing_ratio   = params['teacher_forcing_ratio']
+    learning_rate           = params['learning_rate']
+
+
     dialogue_vcb = load_vocab('DialogSum_Data/dialogue.vcb')
     summary_vcb = load_vocab('DialogSum_Data/summary.vcb')
     vocab_size = len(summary_vcb.index2word)
@@ -413,41 +416,36 @@ if __name__=="__main__":
     # Create Dataset clas
     train_data_list = load_jsonl(TRAIN_DATA)
     
-    if args.DEBUG_ON_SAMPLE:
+    if debug:
         train_data_list = train_data_list[:100]
         print("warning: DEBUG_MODE\n"*3)
 
     train_dataset = SummaryDataset(train_data_list,
                                     sentence_transformers_model="all-MiniLM-L6-v2",
-                                    debug=False)
+                                    debug=debug)
 
     dev_data_list = load_jsonl(DEV_DATA)
     dev_dataset = SummaryDataset(dev_data_list,
                                 sentence_transformers_model="all-MiniLM-L6-v2",
-                                debug=False)
+                                debug=debug)
 
 
-    # Model parameters
-    # MAKE HIDDEN SIZE SAME AS WORD EMBEDDING SIZE FOR NOW
-    # IF WANT DIFFERENT REFACTOR DECODER INIT
     sent_embedding_size = train_dataset.source_embedding_dimension
 
-    batch_size=args.BATCH_SIZE
-
-    hidden_size = 300
-    num_epochs = args.N_EPOCHS
-
     encoder = EncoderRNN(sent_embedding_size, hidden_size).to(device)
-    attn_decoder = AttnDecoderRNN(hidden_size, summary_vcb.n_words, dropout_p=0.1, max_length=MAX_LENGTH).to(device)
+    attn_decoder = AttnDecoderRNN(hidden_size, summary_vcb.n_words, dropout_p=dropout, max_length=max_length).to(device)
 
     orig_encoder = copy.deepcopy(encoder)
     orig_decoder = copy.deepcopy(attn_decoder)
 
-    if args.SANITY_CHECK:
-        trainIters_sanity_check(encoder, attn_decoder, train_dataset, dev_dataset, num_epochs=num_epochs, vocab=summary_vcb, batch_size=batch_size, print_every=500, debug=False)
+    if sanity_check:
+        trainIters_sanity_check(encoder, attn_decoder, train_dataset, dev_dataset, max_epochs=max_epochs, vocab=summary_vcb, batch_size=batch_size, print_every=500, debug=debug)
         exit(0)
 
-    trainIters(encoder, attn_decoder, train_dataset, dev_dataset, num_epochs=num_epochs, vocab=summary_vcb, batch_size=batch_size, print_every=500, debug=False)
+    trainIters(encoder, attn_decoder, train_dataset, dev_dataset, max_epochs=max_epochs, 
+                teacher_forcing_ratio=teacher_forcing_ratio, vocab=summary_vcb, 
+                batch_size=batch_size, learning_rate=learning_rate
+                print_every=500, debug=debug)
 
     assert encoder != orig_encoder #sanity check
     assert attn_decoder != orig_decoder
