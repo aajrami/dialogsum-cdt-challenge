@@ -201,11 +201,11 @@ def collate_function(batch):
     summary_batch = [s["target"] for s in batch]    
 
     dialogue_lengths = torch.tensor([ len(dialogue) for dialogue in dialogue_batch ]).to(device)
-    summary_lengths = torch.tensor([ len(summary) for summary in summary_batch ]).to(device)
-    
+    summary_lengths = torch.tensor([ len(summary) for summary in summary_batch ]).to(device)    
 
     dialogues_padded =   [   torch.stack([torch.ones_like(dialogue_batch[0][0])]   * max(dialogue_lengths)) for dialogue in dialogue_batch]
-    summaries_padded  =   [ torch.tensor([1] * max(summary_lengths)) for summary in summary_batch]
+    summaries_padded  =   [ torch.tensor([1] * (max(summary_lengths) + 2)) for summary in summary_batch] 
+
 
     dialogues_padded  = torch.stack(dialogues_padded).to(device)
     summaries_padded = torch.stack(summaries_padded).to(device)
@@ -217,8 +217,11 @@ def collate_function(batch):
         dialogues_padded[i][:len(dialogue)] = dialogue
     
     for i, summary in enumerate(summary_batch):
-        summaries_padded[i][:len(summary)] = summary
+        summaries_padded[i][0] = SOS_token                    #SOS_token
+        summaries_padded[i][1:len(summary)+1] = summary
+        summaries_padded[i][len(summary)+1] = EOS_token               #EOS_token
     
+
     return { "source": dialogues_padded, "target": summaries_padded, "dataset_index": dataset_index}
 
 

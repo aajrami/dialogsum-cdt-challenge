@@ -36,7 +36,7 @@ def create_vocab(name, sentences):
 
 def sentence_to_tensor(sent, vocab):
     sent = tokenize_sentence(sent)
-    tensor = torch.Tensor([vocab.word2index.get(w, 3) for w in sent])
+    tensor = torch.Tensor([vocab.word2index.get(w, 2) for w in sent])
     return tensor
 
 def tensor_to_sentence(tensor, vocab):
