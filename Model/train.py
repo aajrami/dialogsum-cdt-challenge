@@ -409,7 +409,7 @@ if __name__=="__main__":
     vocab_size = len(summary_vcb.index2word)
 
     # Create Dataset clas
-    train_data_list = load_jsonl(TRAIN_DATA)
+    train_data_list = load_jsonl(SAMPLE_DATA)
     
     if args.DEBUG_ON_SAMPLE:
         train_data_list = train_data_list[:100]
