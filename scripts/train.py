@@ -29,7 +29,6 @@ SOS_token = 0
 EOS_token = 1
 
 DATA_DIR = "DialogSum_Data"
-
 SAMPLE_DATA = op.join(DATA_DIR, 'dialogsum.sample.jsonl')
 TEST_DATA = op.join(DATA_DIR, 'dialogsum.test.jsonl')
 TRAIN_DATA = op.join(DATA_DIR, 'dialogsum.train.jsonl')
@@ -277,7 +276,7 @@ def get_all_predictions_sanity_check(encoder, decoder, vocab, criterion, dataset
 
 
 
-def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False, experiment_name=args.EXPERIMENT_NAME):
+def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False):
     start = time.time()
     plot_losses = []
     print_loss_total = 0  # Reset every print_every
@@ -331,7 +330,7 @@ def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, max_ep
 
 
 
-def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False, experiment_name=args.EXPERIMENT_NAME):
+def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False):
     start = time.time()
     train_losses = []
     dev_losses = []
