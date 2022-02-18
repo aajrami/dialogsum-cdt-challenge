@@ -138,7 +138,7 @@ def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, deco
     return loss.item() / output_length
 
 
-
+# Decodes a batch
 def decode(input_tensor, encoder, decoder, vocab, batch_size=1, max_length=MAX_LENGTH, debug=False):
     
     batch_encoder_hidden = torch.cat(batch_size * [encoder.initHidden()], dim=1)
@@ -162,9 +162,6 @@ def decode(input_tensor, encoder, decoder, vocab, batch_size=1, max_length=MAX_L
     batch_decoder_input = torch.cat(batch_size * [batch_decoder_input], dim=0)
 
     batch_decoder_hidden = batch_encoder_hidden
-
-    use_teacher_forcing = True if random.random() < teacher_forcing_ratio else False
-
 
     eos_list = [False] * batch_size
 
@@ -225,6 +222,8 @@ def collate_function(batch):
 
 def get_all_predictions(encoder, decoder, vocab, dataset, batch_size=4):
 
+    dev_loss = 0
+
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_function)
 
     predictions = []
@@ -245,7 +244,7 @@ def get_all_predictions(encoder, decoder, vocab, dataset, batch_size=4):
 
     predictions_df = pd.DataFrame(predictions)
 
-    return(predictions_df)
+    return(predictions_df), dev_loss
 
 
 
@@ -254,12 +253,12 @@ def get_all_predictions(encoder, decoder, vocab, dataset, batch_size=4):
 def trainIters(encoder, decoder, train_dataset, dev_dataset, num_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False, experiment_name=args.EXPERIMENT_NAME):
     start = time.time()
     plot_losses = []
-    print_loss_total = 0  # Reset every print_every
-    plot_loss_total = 0  # Reset every plot_every
+    print_loss_total = 0  # Reset every epoch
+    plot_loss_total = 0  # Reset every epoch
 
     encoder_optimizer = optim.Adam(encoder.parameters(), lr=learning_rate)
     decoder_optimizer = optim.Adam(decoder.parameters(), lr=learning_rate)
-    criterion = nn.CrossEntropyLoss(ignore_index=3)
+    criterion = nn.CrossEntropyLoss(ignore_index=3) # ignore padding token
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_function)
 
@@ -280,18 +279,29 @@ def trainIters(encoder, decoder, train_dataset, dev_dataset, num_epochs, vocab=N
             print_loss_total += loss
             plot_loss_total += loss
 
-            if iter % print_every == 0:
-                print_loss_avg = print_loss_total / print_every
-                print_loss_total = 0
-                print('%s (%d %d%%) %.4f' % (timeSince(start, epoch*len(train_dataset) + iter / (epoch*len(train_dataset))),
-                                            epoch*len(train_dataset) + iter, iter / (epoch*len(train_dataset)) * 100, print_loss_avg))
+            # Want to print every epoch not every print_every batches
+            # if iter % print_every == 0:
+            #     print_loss_avg = print_loss_total / print_every
+            #     print_loss_total = 0
+                # print('%s (%d %d%%) %.4f' % (timeSince(start, epoch*len(train_dataset) + iter / (epoch*len(train_dataset))),
+                #                             epoch*len(train_dataset) + iter, iter / (epoch*len(train_dataset)) * 100, print_loss_avg))
 
-            if iter % plot_every == 0:
-                plot_loss_avg = plot_loss_total / plot_every
-                plot_losses.append(plot_loss_avg)
-                plot_loss_total = 0
+            # if iter % plot_every == 0:
+            #     plot_loss_avg = plot_loss_total / plot_every
+            #     plot_losses.append(plot_loss_avg)
+            #     plot_loss_total = 0
 
-        predictions_df = get_all_predictions(encoder, attn_decoder, vocab, dev_dataset)
+        print_loss_avg = print_loss_total / len(train_dataset)
+        print_loss_total = 0
+
+        print('{} . Epoch {:2d}: avg_loss: {:.4f}'.format(timeSince(start, epoch/num_epochs), epoch, print_loss_avg))
+
+        plot_loss_total = plot_loss_total / len(train_dataset)
+        plot_losses.append(plot_loss_total)
+        plot_loss_total = 0
+
+        # Validate at the end of each epoch
+        predictions_df, dev_loss = get_all_predictions(encoder, attn_decoder, vocab, dev_dataset)
         predictions_df.to_csv(op.join("experiments", experiment_name, f"{epoch}_epochs.csv"))
 
     showPlot(plot_losses)
