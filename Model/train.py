@@ -86,15 +86,12 @@ def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, deco
 
     loss = 0
 
-    ### NEED TO CHANGE TO IMPLEMENT SOME MAX LENGTH
     for ei in range(input_length):
 
         batch_encoder_inputs = input_tensor[:,ei,:].reshape(batch_size, 1, -1)
 
         batch_encoder_output, batch_encoder_hidden = encoder(
             batch_encoder_inputs, batch_encoder_hidden)
-
-        # MIGHT NOT WORK WITH BATCHING
         batch_encoder_hidden_states[:,ei,:] = batch_encoder_output[0, 0]
 
     batch_decoder_input = torch.tensor([[SOS_token]], device=device)
@@ -133,7 +130,6 @@ def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, deco
                 break
 
     loss.backward()
-
     encoder_optimizer.step()
     decoder_optimizer.step()
 
@@ -141,15 +137,17 @@ def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, deco
 
 
 # Decodes a batch
-def decode(input_tensor, encoder, decoder, vocab, batch_size=1, max_length=MAX_LENGTH, debug=False):
+def decode(input_tensor, output_tensor, encoder, decoder, criterion, vocab, batch_size=1, max_length=MAX_LENGTH, debug=False):
     
-    batch_encoder_hidden = torch.cat(batch_size * [encoder.initHidden()], dim=1)
-    
+    loss = 0
+
     input_length = input_tensor.size(1)
+    output_length = output_tensor.size(1)
+
+    batch_encoder_hidden = torch.cat(batch_size * [encoder.initHidden()], dim=1)
     batch_encoder_hidden_states = torch.zeros(batch_size, max_length, encoder.hidden_size, device=device)
 
-
-    ### NEED TO CHANGE TO IMPLEMENT SOME MAX LENGTH
+    # encoding
     for ei in range(input_length):
 
         batch_encoder_inputs = input_tensor[:,ei,:].reshape(batch_size, 1, -1)
@@ -157,29 +155,30 @@ def decode(input_tensor, encoder, decoder, vocab, batch_size=1, max_length=MAX_L
         batch_encoder_output, batch_encoder_hidden = encoder(
             batch_encoder_inputs, batch_encoder_hidden)
 
-        # MIGHT NOT WORK WITH BATCHING
         batch_encoder_hidden_states[:,ei,:] = batch_encoder_output[0, 0]
 
+    # decoding
     batch_decoder_input = torch.tensor([[SOS_token]], device=device)
     batch_decoder_input = torch.cat(batch_size * [batch_decoder_input], dim=0)
-
     batch_decoder_hidden = batch_encoder_hidden
 
     eos_list = [False] * batch_size
 
     # Without teacher forcing: use its own predictions as the next input
-
     outputs = []
-
-    for di in range(max_length):
+    for di in range(output_length):
         batch_decoder_output, batch_decoder_hidden, decoder_attention = decoder(
             batch_decoder_input, batch_decoder_hidden, batch_encoder_hidden_states)
         topv, topi = batch_decoder_output.topk(1)
         decoder_input = topi.squeeze().detach()  # detach from history as input
-
         outputs.append(topi)
+        #print(f'batch_decoder_output : {batch_decoder_output.shape}')
+        #print(f'outputs : {outputs}')
+        #print(f'output_tensor : {output_tensor}')
+        #print(f'output_tensor : {output_tensor.shape}')
+        #print(f'output_tensor[:,di] {output_tensor[:,di].shape} ')
+        loss += criterion(batch_decoder_output, output_tensor[:,di].to(torch.long))
 
-        
         for i, inp in enumerate(decoder_input):
             if inp.item() == EOS_token:
                 eos_list[i] = True
@@ -190,7 +189,7 @@ def decode(input_tensor, encoder, decoder, vocab, batch_size=1, max_length=MAX_L
     output_sentence = [tensor_to_sentence(outputs[i], vocab) for i in range(len(outputs))]
     
 
-    return output_sentence
+    return output_sentence, loss.item() / output_length
 
 
 def collate_function(batch):
@@ -225,7 +224,7 @@ def collate_function(batch):
 
 
 
-def get_all_predictions(encoder, decoder, vocab, dataset, batch_size=4):
+def get_all_predictions(encoder, decoder, vocab, criterion, dataset, batch_size=4):
 
     dev_loss = 0
 
@@ -236,8 +235,11 @@ def get_all_predictions(encoder, decoder, vocab, dataset, batch_size=4):
     for batch in dataloader:
         dataset_indices = batch["dataset_index"]
         input_tensor = batch["source"]
-        outputs = decode(input_tensor, encoder, decoder, vocab, batch_size=batch_size)
+        output_tensor = batch["target"]
+        outputs, loss = decode(input_tensor, output_tensor, encoder, decoder, criterion, vocab, batch_size=batch_size)
         pred_summaries = [" ".join(decoded_sent) for decoded_sent in outputs]
+        dev_loss += loss
+
         dialogues = [dataset[idx.item()]["dialogue_text"] for idx in dataset_indices]
         gold_summaries = [dataset[idx.item()]["summary_text"] for idx in dataset_indices]
         for i in range(len(dataset_indices)):
@@ -341,8 +343,9 @@ def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, num_ep
 
 def trainIters(encoder, decoder, train_dataset, dev_dataset, num_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False, experiment_name=args.EXPERIMENT_NAME):
     start = time.time()
-    plot_losses = []
-    print_loss_total = 0  # Reset every epoch
+    train_losses = []
+    dev_losses = []
+    train_loss_total = 0  # Reset every epoch
     plot_loss_total = 0  # Reset every epoch
 
     encoder_optimizer = optim.Adam(encoder.parameters(), lr=learning_rate)
@@ -365,46 +368,36 @@ def trainIters(encoder, decoder, train_dataset, dev_dataset, num_epochs, vocab=N
                         decoder, encoder_optimizer, decoder_optimizer, 
                         criterion, batch_size=batch_size, debug=debug)
             
-            print_loss_total += loss
+            train_loss_total += loss
             plot_loss_total += loss
 
-            # Want to print every epoch not every print_every batches
-            # if iter % print_every == 0:
-            #     print_loss_avg = print_loss_total / print_every
-            #     print_loss_total = 0
-                # print('%s (%d %d%%) %.4f' % (timeSince(start, epoch*len(train_dataset) + iter / (epoch*len(train_dataset))),
-                #                             epoch*len(train_dataset) + iter, iter / (epoch*len(train_dataset)) * 100, print_loss_avg))
-
-            # if iter % plot_every == 0:
-            #     plot_loss_avg = plot_loss_total / plot_every
-            #     plot_losses.append(plot_loss_avg)
-            #     plot_loss_total = 0
-
-        print_loss_avg = print_loss_total / len(train_dataset)
-        print_loss_total = 0
-
-        print('{} . Epoch {:2d}: avg_loss: {:.4f}'.format(timeSince(start, epoch/num_epochs), epoch, print_loss_avg))
-
-        plot_loss_total = plot_loss_total / len(train_dataset)
-        plot_losses.append(plot_loss_total)
-        plot_loss_total = 0
-
         # Validate at the end of each epoch
-        predictions_df, dev_loss = get_all_predictions(encoder, attn_decoder, vocab, dev_dataset)
+        predictions_df, dev_loss_total = get_all_predictions(encoder, attn_decoder, vocab, criterion, dev_dataset)
         predictions_df.to_csv(op.join("experiments", experiment_name, f"{epoch}_epochs.csv"))
 
-    showPlot(plot_losses)
+        train_loss_avg = train_loss_total / len(train_dataset)
+        train_losses.append(train_loss_avg)
+        dev_loss_avg = dev_loss_total / len(dev_dataset)
+        dev_losses.append(dev_loss_avg)
+
+        print('{} . Epoch {:2d}: train_loss: {:.4f} : dev_loss: {:.4f}'.format(timeSince(start, epoch/num_epochs+1), epoch, train_loss_avg, dev_loss_avg))
+        train_loss_total = 0
+
+
+    showPlot(train_losses, dev_losses)
 
 
 
 ## PLOTTING FUNCTIONS
-def showPlot(points):
+def showPlot(train_points, dev_points):
+
     plt.figure()
-    fig, ax = plt.subplots()
-    # this locator puts ticks at regular intervals
-    loc = ticker.MultipleLocator(base=0.2)
-    ax.yaxis.set_major_locator(loc)
-    plt.plot(points)
+    x = range(1,len(train_points)+1)
+    y1 = train_points
+    y2 = dev_points
+    plt.plot(x, y1, "-b", label="train")
+    plt.plot(x, y2, "-r", label="dev")
+    plt.legend(loc="upper right")
     plt.savefig('plot.png')
 
 
@@ -439,7 +432,7 @@ if __name__=="__main__":
 
     batch_size=args.BATCH_SIZE
 
-    hidden_size = 50
+    hidden_size = 30
     num_epochs = args.N_EPOCHS
 
 
@@ -463,5 +456,5 @@ if __name__=="__main__":
     predictions_df = get_all_predictions(encoder, attn_decoder, summary_vcb, dev_dataset)
 
 
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
 

@@ -6,3 +6,4 @@ slurm_output/*
 bessemer_job.sh
 models_cache/*
 slurm*
+experiments
