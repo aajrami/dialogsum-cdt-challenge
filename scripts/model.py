@@ -37,7 +37,7 @@ class EncoderRNN(nn.Module):
         if debug: print(f'input : {input.shape}')
         if debug: print(f'hidden : {hidden.shape}')
         output, hidden = self.gru(input, hidden)
-        
+                
         return output, hidden
 
     def initHidden(self):
@@ -74,7 +74,6 @@ class AttnDecoderRNN(nn.Module):
 
     def forward(self, input, hidden, encoder_hidden):
 
-        debug = True
     
         if debug: print(f'input: {input.shape}')
         if debug: print(f'hidden: {hidden.shape}')
@@ -96,12 +95,17 @@ class AttnDecoderRNN(nn.Module):
         if debug: print(f'torch.cat((embedded[:,0], hidden[:,0]), 1) : {torch.cat((embedded[:,0], hidden[0]), 1).shape}')
         if debug: print(f'self.attn : {self.attn}')
 
- 
+        if debug: print(f"self.max_length: {self.max_length}")
+
+
         attn_weights = F.softmax(
             self.attn(torch.cat((embedded[:,0], hidden[0]), 1)), dim=1).unsqueeze(1)
-        
+
+
+        #encoder_hidden = encoder_hidden.permute((0,2,1))        
         if debug: print(f'attn weights: {attn_weights.shape}')
         if debug: print(f'encoder_hidden: {encoder_hidden.shape}')
+
 
         attn_applied = torch.bmm(attn_weights,
                                  encoder_hidden)

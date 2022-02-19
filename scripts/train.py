@@ -278,7 +278,7 @@ def get_all_predictions_sanity_check(encoder, decoder, vocab, criterion, dataset
 
 
 
-def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False):
+def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False, patience = 5, early_stopping=True, teacher_forcing_ratio=0.5, max_length=50):
     start = time.time()
     plot_losses = []
     print_loss_total = 0  # Reset every print_every
@@ -308,7 +308,8 @@ def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, max_ep
 
             loss = train(input_tensor, output_tensor, encoder,
                         decoder, encoder_optimizer, decoder_optimizer, 
-                        criterion, batch_size=batch_size, debug=debug)
+                        criterion, batch_size=batch_size, debug=debug,
+                        max_length=max_length)
             
             print_loss_total += loss
             plot_loss_total += loss
@@ -335,6 +336,8 @@ def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, max_ep
 def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False, patience = 5, early_stopping=True, teacher_forcing_ratio=0.5, max_length=50):
     if not early_stopping:
         patience = float("inf")
+
+    print("starting trainIters")
 
     start = time.time()
     train_losses = []
@@ -363,7 +366,8 @@ def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=N
 
             loss = train(input_tensor, output_tensor, encoder,
                         decoder, encoder_optimizer, decoder_optimizer, 
-                        criterion, batch_size=batch_size, debug=debug)
+                        criterion, batch_size=batch_size, debug=debug,
+                        max_length=max_length)
             
             train_loss_total += loss
             plot_loss_total += loss
@@ -483,21 +487,26 @@ if __name__=="__main__":
     sent_embedding_size = train_dataset.source_embedding_dimension
 
     encoder = EncoderRNN(sent_embedding_size, hidden_size).to(device)
+
     attn_decoder = AttnDecoderRNN(hidden_size, summary_vcb.n_words, dropout_p=dropout, max_length=max_length).to(device)
 
     orig_encoder = copy.deepcopy(encoder)
     orig_decoder = copy.deepcopy(attn_decoder)
 
     if sanity_check:
-        print("doing sanity check")
-        trainIters_sanity_check(encoder, attn_decoder, train_dataset, dev_dataset, max_epochs=max_epochs, vocab=summary_vcb, batch_size=batch_size, print_every=500, debug=debug)
-        exit(0)
+        trainIters_sanity_check(encoder, attn_decoder, train_dataset, dev_dataset, max_epochs=max_epochs, 
+                teacher_forcing_ratio=teacher_forcing_ratio, vocab=summary_vcb, 
+                batch_size=batch_size, learning_rate=learning_rate,
+                patience=patience, early_stopping=early_stopping,
+                print_every=500, debug=debug,
+                max_length=max_length)
 
     trainIters(encoder, attn_decoder, train_dataset, dev_dataset, max_epochs=max_epochs, 
                 teacher_forcing_ratio=teacher_forcing_ratio, vocab=summary_vcb, 
                 batch_size=batch_size, learning_rate=learning_rate,
                 patience=patience, early_stopping=early_stopping,
-                print_every=500, debug=debug)
+                print_every=500, debug=debug,
+                max_length=max_length)
 
     assert encoder != orig_encoder #sanity check
     assert attn_decoder != orig_decoder
