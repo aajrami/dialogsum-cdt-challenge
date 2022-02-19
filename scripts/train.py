@@ -244,7 +244,9 @@ def get_all_predictions(encoder, decoder, vocab, criterion, dataset, batch_size=
     return(predictions_df), dev_loss
 
 
-def get_all_predictions_sanity_check(encoder, decoder, vocab, criterion, dataset, batch_size=4):
+def get_all_predictions_sanity_check(encoder, decoder, vocab, criterion, dataset, batch_size=4, max_length=49):
+
+    print("getting predictions")
 
     dev_loss = 0
 
@@ -255,12 +257,15 @@ def get_all_predictions_sanity_check(encoder, decoder, vocab, criterion, dataset
     batches = dataloader.__iter__()
     batch = next(batches)
     
-    for _ in dataloader:
+    for b_idx, _ in enumerate(dataloader):
+
+        print(f"predicting {b_idx} of {len(dataloader)}")
 
         dataset_indices = batch["dataset_index"]
         input_tensor = batch["source"]
         output_tensor = batch["target"]
-        outputs = decode(input_tensor, output_tensor, encoder, decoder, criterion, vocab, batch_size=batch_size)
+        outputs, loss = decode(input_tensor, output_tensor, encoder, decoder, criterion, vocab, batch_size=batch_size, max_length=max_length)
+       
         pred_summaries = [" ".join(decoded_sent) for decoded_sent in outputs]
         dialogues = [dataset[idx.item()]["dialogue_text"] for idx in dataset_indices]
         gold_summaries = [dataset[idx.item()]["summary_text"] for idx in dataset_indices]
@@ -270,6 +275,7 @@ def get_all_predictions_sanity_check(encoder, decoder, vocab, criterion, dataset
             pred_dict["gold_summary"] = gold_summaries[i]
             pred_dict["predicted_summary"] = pred_summaries[i]
             predictions.append(pred_dict)
+        break
 
     predictions_df = pd.DataFrame(predictions)
 
@@ -297,9 +303,10 @@ def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, max_ep
     
 
         training_batches = train_loader.__iter__()
+        
         batch_0 = next(training_batches)
 
-        for iter, _ in enumerate(train_loader):
+        for iter, _ in [(1,1)]:
             print(f"training batch {iter} of {len(train_loader)}")
             training_batch = batch_0
     
@@ -325,7 +332,7 @@ def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, max_ep
                 plot_losses.append(plot_loss_avg)
                 plot_loss_total = 0
 
-        predictions_df, loss = get_all_predictions_sanity_check(encoder, attn_decoder, vocab, train_dataset, batch_size=batch_size)
+        predictions_df, loss = get_all_predictions_sanity_check(encoder, attn_decoder, vocab, criterion, train_dataset, batch_size=batch_size, max_length=max_length)
         predictions_df.to_csv(op.join("experiments", experiment_name, f"{epoch}_epochs.csv"))
 
     showPlot(plot_losses)
@@ -471,17 +478,17 @@ if __name__=="__main__":
     train_data_list = load_jsonl(TRAIN_DATA)
     
     if debug:
-        train_data_list = train_data_list[:100]
+        train_data_list = train_data_list[:10]
         print("warning: DEBUG_MODE\n"*3)
 
     train_dataset = SummaryDataset(train_data_list,
                                     sentence_transformers_model="all-MiniLM-L6-v2",
-                                    debug=debug)
+                                    debug=False)
 
     dev_data_list = load_jsonl(DEV_DATA)
     dev_dataset = SummaryDataset(dev_data_list,
                                 sentence_transformers_model="all-MiniLM-L6-v2",
-                                debug=debug)
+                                debug=False)
 
 
     sent_embedding_size = train_dataset.source_embedding_dimension
@@ -500,6 +507,7 @@ if __name__=="__main__":
                 patience=patience, early_stopping=early_stopping,
                 print_every=500, debug=debug,
                 max_length=max_length)
+        exit(1)
 
     trainIters(encoder, attn_decoder, train_dataset, dev_dataset, max_epochs=max_epochs, 
                 teacher_forcing_ratio=teacher_forcing_ratio, vocab=summary_vcb, 
