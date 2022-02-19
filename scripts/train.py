@@ -306,7 +306,7 @@ def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, max_ep
         
         batch_0 = next(training_batches)
 
-        for iter, _ in [(1,1)]:
+        for iter, _ in enumerate(training_batches):
             print(f"training batch {iter} of {len(train_loader)}")
             training_batch = batch_0
     
