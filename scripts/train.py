@@ -64,10 +64,12 @@ def timeSince(since, percent):
 ## TRAINING FUNCTIONS
 def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, batch_size=1, max_length=50, debug=False):
     
+    batch_size = input_tensor.size(0)
     batch_encoder_hidden = torch.cat(batch_size * [encoder.initHidden()], dim=1)
     
     encoder_optimizer.zero_grad()
     decoder_optimizer.zero_grad()
+
 
     input_length = input_tensor.size(1)
     output_length = output_tensor.size(1)
@@ -128,11 +130,14 @@ def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, deco
 
 # Decodes a batch
 def decode(input_tensor, output_tensor, encoder, decoder, criterion, vocab, batch_size=1, max_length=50, debug=False):
+    #Note batch_size keyword unused
     
     loss = 0
 
     input_length = input_tensor.size(1)
     output_length = output_tensor.size(1)
+
+    batch_size=input_tensor.shape[0]
 
     batch_encoder_hidden = torch.cat(batch_size * [encoder.initHidden()], dim=1)
     batch_encoder_hidden_states = torch.zeros(batch_size, max_length, encoder.hidden_size, device=device)
@@ -142,8 +147,11 @@ def decode(input_tensor, output_tensor, encoder, decoder, criterion, vocab, batc
 
         batch_encoder_inputs = input_tensor[:,ei,:].reshape(batch_size, 1, -1)
 
-        batch_encoder_output, batch_encoder_hidden = encoder(
+        try:
+            batch_encoder_output, batch_encoder_hidden = encoder(
             batch_encoder_inputs, batch_encoder_hidden)
+        except:
+            import pdb; pdb.set_trace()
 
         batch_encoder_hidden_states[:,ei,:] = batch_encoder_output[0, 0]
 
@@ -298,7 +306,7 @@ def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, max_ep
 
     os.makedirs(op.join("experiments", experiment_name), exist_ok=True)
 
-    for epoch in range(1, max_epochs+1):
+    for epoch in range(1, max_epochs):#+1):
         print(f"starting epoch {epoch}")
     
 
@@ -371,6 +379,7 @@ def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=N
             input_tensor = training_batch['source']
             output_tensor = training_batch['target']
 
+
             loss = train(input_tensor, output_tensor, encoder,
                         decoder, encoder_optimizer, decoder_optimizer, 
                         criterion, batch_size=batch_size, debug=debug,
@@ -380,7 +389,7 @@ def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=N
             plot_loss_total += loss
 
         # Validate at the end of each epoch
-        predictions_df, dev_loss_total = get_all_predictions(encoder, attn_decoder, vocab, criterion, dev_dataset, max_length=max_length)
+        predictions_df, dev_loss_total = get_all_predictions(encoder, attn_decoder, vocab, criterion, dev_dataset, max_length=max_length, batch_size=batch_size)
         predictions_df.to_csv(op.join("experiments", experiment_name, f"{epoch}_epochs.csv"))
 
         train_loss_avg = train_loss_total / len(train_dataset)
@@ -478,7 +487,7 @@ if __name__=="__main__":
     train_data_list = load_jsonl(TRAIN_DATA)
     
     if debug:
-        train_data_list = train_data_list[:10]
+        train_data_list = train_data_list[:16]
         print("warning: DEBUG_MODE\n"*3)
 
     train_dataset = SummaryDataset(train_data_list,
@@ -495,12 +504,15 @@ if __name__=="__main__":
 
     encoder = EncoderRNN(sent_embedding_size, hidden_size).to(device)
 
+    print(sent_embedding_size)
     attn_decoder = AttnDecoderRNN(hidden_size, summary_vcb.n_words, dropout_p=dropout, max_length=max_length).to(device)
+
 
     orig_encoder = copy.deepcopy(encoder)
     orig_decoder = copy.deepcopy(attn_decoder)
 
     if sanity_check:
+        print("This is sanity check")
         trainIters_sanity_check(encoder, attn_decoder, train_dataset, dev_dataset, max_epochs=max_epochs, 
                 teacher_forcing_ratio=teacher_forcing_ratio, vocab=summary_vcb, 
                 batch_size=batch_size, learning_rate=learning_rate,
