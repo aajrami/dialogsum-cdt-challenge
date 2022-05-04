@@ -2,12 +2,12 @@ from vocab import EOS_token, Vocab, load_vocab, tensor_to_sentence
 from model import EncoderRNN, AttnDecoderRNN
 from summary_dataset import SummaryDataset
 
-import argparse
 import copy
 import time
 import math
 import os
 import os.path as op
+from pprint import pprint
 import random
 import sys
 import json
@@ -38,15 +38,11 @@ DEV_DATA = op.join(DATA_DIR, 'dialogsum.dev.jsonl')
 
 ## HELPER FUNCTIONS
 def load_jsonl(filepath):
-    
     output_list = []
-    
     with open(filepath) as sd_file:
         lines = sd_file.readlines()
-    
     for line in lines:
         output_list.append(json.loads(line))
-
     return output_list
 
 def asMinutes(s):
@@ -69,7 +65,6 @@ def train(input_tensor, output_tensor, encoder, decoder, encoder_optimizer, deco
     
     encoder_optimizer.zero_grad()
     decoder_optimizer.zero_grad()
-
 
     input_length = input_tensor.size(1)
     output_length = output_tensor.size(1)
@@ -348,7 +343,7 @@ def trainIters_sanity_check(encoder, decoder, train_dataset, dev_dataset, max_ep
 
 
 
-def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False, patience = 5, early_stopping=True, teacher_forcing_ratio=0.5, max_length=50):
+def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, experiment_name="default", vocab=None, batch_size=1, print_every=500, plot_every=100, learning_rate=0.01, debug=False, patience = 5, early_stopping=True, teacher_forcing_ratio=0.5, max_length=50):
     if not early_stopping:
         patience = float("inf")
 
@@ -374,7 +369,7 @@ def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=N
     for epoch in range(1, max_epochs+1):
         print(f"starting epoch {epoch}")
     
-        for iter, training_batch in enumerate(train_loader):
+        for training_batch in train_loader:
 
             input_tensor = training_batch['source']
             output_tensor = training_batch['target']
@@ -390,7 +385,7 @@ def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=N
 
         # Validate at the end of each epoch
         predictions_df, dev_loss_total = get_all_predictions(encoder, attn_decoder, vocab, criterion, dev_dataset, max_length=max_length, batch_size=batch_size)
-        predictions_df.to_csv(op.join("experiments", experiment_name, f"{epoch}_epochs.csv"))
+        predictions_df.to_csv(f"experiments/{experiment_name}/{epoch}_epochs.csv")
 
         train_loss_avg = train_loss_total / len(train_dataset)
         train_losses.append(train_loss_avg)
@@ -420,31 +415,32 @@ def trainIters(encoder, decoder, train_dataset, dev_dataset, max_epochs, vocab=N
             break
 
     # keep the best model and delete tmp
-    if not os.path.exists('saved_model/encoder'):
-            os.makedirs('saved_model/encoder')
-    if not os.path.exists('saved_model/decoder'):
-            os.makedirs('saved_model/decoder')
+
+
+    if op.exists(f'experiments/{experiment_name}/best_model'):
+        shutil.rmtree(f"experiments/{experiment_name}/best_model")
+
+    os.makedirs(f'experiments/{experiment_name}/best_model')
     
     # index of best model
     idx  = dev_losses.index(min(dev_losses)) + 1
     # remove old files if exist
-    if os.path.exists(f'saved_model/encoder/{idx}'):
-        os.remove(f'saved_model/encoder/{idx}')
-    if os.path.exists(f'saved_model/decoder/{idx}'):
-        os.remove(f'saved_model/decoder/{idx}')
     # move the best model from tmp to saved_model
     print(f'Saving the best model from epoch {idx} ...')
-    shutil.move(f'tmp/encoder/{idx}', 'saved_model/encoder')
-    shutil.move(f'tmp/decoder/{idx}', 'saved_model/decoder')
+
+    shutil.move(f'tmp/encoder/{idx}', f'experiments/{experiment_name}/best_model/encoder')
+    shutil.move(f'tmp/decoder/{idx}', f'experiments/{experiment_name}/best_model/decoder')
     # remove tmp folder
     shutil.rmtree('tmp')
+    with open(f"experiments/{experiment_name}/results.txt", "a+") as results_file:
+        results_file.write(f"Best epoch: {idx}")
 
-    showPlot(train_losses, dev_losses)
+    showPlot(train_losses, dev_losses, f"experiments/{experiment_name}")
 
 
 
 ## PLOTTING FUNCTIONS
-def showPlot(train_points, dev_points):
+def showPlot(train_points, dev_points, save_folder= "."):
 
     plt.figure()
     x = range(1,len(train_points)+1)
@@ -454,30 +450,31 @@ def showPlot(train_points, dev_points):
     plt.plot(x, y1, "-b", label="train")
     plt.plot(x, y2, "-r", label="dev")
     plt.legend(loc="upper right")
-    plt.savefig('plot.png')
+    plt.savefig(op.join(save_folder,'plot.png'))
 
 
 if __name__=="__main__":
 
-    params_fp = sys.argv[1]
+
+    experiment_name = sys.argv[1]
+    params_fp = op.join("experiments", experiment_name, "params.json")
    
     
     with open(params_fp, "r") as params_file:
         params = json.load(params_file)
-    experiment_name         = params['experiment_name']
-    experiment_id           = params['experiment_id']
-    debug                   = params['debug']
-    sanity_check            = params['sanity_check']
-    early_stopping          = params['early_stopping']
-    patience                = params['patience']
-    max_epochs              = params['max_epochs']
-    hidden_size             = params['hidden_size']
-    batch_size              = params['batch_size']
-    max_length              = params['max_length']
-    dropout                 = params['dropout']
-    teacher_forcing_ratio   = params['teacher_forcing_ratio']
-    learning_rate           = params['learning_rate']
+        debug                   = params['debug']
+        sanity_check            = params['sanity_check']
+        early_stopping          = params['early_stopping']
+        patience                = params['patience']
+        max_epochs              = params['max_epochs']
+        hidden_size             = params['hidden_size']
+        batch_size              = params['batch_size']
+        max_length              = params['max_length']
+        dropout                 = params['dropout']
+        teacher_forcing_ratio   = params['teacher_forcing_ratio']
+        learning_rate           = params['learning_rate']
 
+    pprint(params)
 
     dialogue_vcb = load_vocab('DialogSum_Data/dialogue.vcb')
     summary_vcb = load_vocab('DialogSum_Data/summary.vcb')
@@ -504,7 +501,7 @@ if __name__=="__main__":
 
     encoder = EncoderRNN(sent_embedding_size, hidden_size).to(device)
 
-    print(sent_embedding_size)
+    print(f"sent embedding size: {sent_embedding_size}")
     attn_decoder = AttnDecoderRNN(hidden_size, summary_vcb.n_words, dropout_p=dropout, max_length=max_length).to(device)
 
 
@@ -522,7 +519,8 @@ if __name__=="__main__":
         exit(1)
 
     trainIters(encoder, attn_decoder, train_dataset, dev_dataset, max_epochs=max_epochs, 
-                teacher_forcing_ratio=teacher_forcing_ratio, vocab=summary_vcb, 
+                teacher_forcing_ratio=teacher_forcing_ratio, vocab=summary_vcb,
+                experiment_name=experiment_name, 
                 batch_size=batch_size, learning_rate=learning_rate,
                 patience=patience, early_stopping=early_stopping,
                 print_every=500, debug=debug,

@@ -1,3 +1,3 @@
 #!/bin/bash 
 
-python scripts/train.py params.json
+python scripts/train.py model_1

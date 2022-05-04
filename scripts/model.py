@@ -34,9 +34,8 @@ class EncoderRNN(nn.Module):
         # embedded = self.embedding(input).view(1, 1, -1)
         # output = embedded
         # output, hidden = self.gru(output, hidden)
-        debug=True
-        if debug: print(f'input : {input.shape}')
-        if debug: print(f'hidden : {hidden.shape}')
+#        if debug: print(f'input : {input.shape}')
+ #       if debug: print(f'hidden : {hidden.shape}')
         output, hidden = self.gru(input, hidden)
                 
         return output, hidden
