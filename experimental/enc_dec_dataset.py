@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import Dataset
 from sentence_transformers import SentenceTransformer
 import re
-
+from torch.nn import Module
 
 def replace_newlines(text):
     text = re.sub("[\n\W]*\n[\n\W]*", "<extra_id_0>", text)
@@ -14,7 +14,7 @@ def replace_newlines(text):
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-class T5Dataset(Dataset):
+class EncDecDataset(Dataset):
     """
     A dataset for returning pairs of dialogue encodings and summary encodings
     """
@@ -51,18 +51,15 @@ class T5Dataset(Dataset):
 
     def _dialogue_encode(self, dialogue_text):
 
-        dialogue_text = dialogue_text.strip(" ")
-        text_with_newline_breaks = replace_newlines(dialogue_text)
-        sents_list = text_with_newline_breaks.split("<extra_id_0>")
-        attention_mask = torch.Tensor([[[1,1,1]]*len(sents_list)])
+        dialogue_list = dialogue_text.split("\n")
 
         
-        encoding = self.tokenizer.batch_encode_plus([replace_newlines(dialogue_text)], return_tensors="pt", padding=True)
+        encoding = self.tokenizer.batch_encode_plus(dialogue_list, return_tensors="pt", padding=True)
 
-        # if self.debug == True:
-        #     print(encoding.shape)
+        input_ids = encoding["input_ids"][0]
 
-        #encoding["attention_mask"] = attention_mask
+        encoding["attention_mask"] = torch.Tensor([[1]*len(input_ids)])
+
         return encoding
 
   
@@ -71,35 +68,6 @@ class T5Dataset(Dataset):
         encoding = self.tokenizer.batch_encode_plus([summary_text], return_tensors="pt", padding=True)
 
         return encoding
-
-        #         target = self.tokenizer.batch_encode_plus(
-        #     [target_text],
-        #     max_length=self.summ_len,
-        #     pad_to_max_length=True,
-        #     truncation=True,
-        #     padding="max_length",
-        #     return_tensors="pt",
-        # )
-        [1, 0, 0],
-        # """
-        # return the input ids, attention masks and target ids"""
-# 
-        # datapoint_dict = self.source_target_list[index]
-        # 
-        # source_text = datapoint_dict["dialogue"]
-        # target_text = datapoint_dict["summary"]
-# 
-        # source = self._dialogue_encode(source_text)
-        # target = self._summary_encode(target_text)
-# 
-# 
-        # return {
-            # "dialogue_text": source_text,
-            # "summary_text": target_text,
-            # "source": source.to(dtype=torch.float).to(device),
-            # "target": target.to(dtype=torch.float).to(device),
-            # "index": index
-        # }
 
     def __getitem__(self, index):
         """return the input ids, attention masks and target ids"""
@@ -124,3 +92,44 @@ class T5Dataset(Dataset):
             "target_ids": target_ids.to(dtype=torch.long),
             "target_mask": target_mask.to(dtype=torch.long),
         }
+
+
+from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAttentions
+from transformers.modeling_utils import PreTrainedModel
+from torch.nn.utils.rnn import pad_sequence
+from transformers.models.bert.modeling_bert import BertPooler
+import torch
+
+class Config():
+    pass
+
+class CustomEncoder(Module):
+    def __init__(self, encoder, *args, **kwargs):    
+        super().__init__(*args, **kwargs)
+        self.sub_encoder = encoder
+        pooler_config = Config()
+        pooler_config.hidden_size = 768
+        self.bert_pooler = BertPooler(pooler_config)
+
+    def forward(self, input_ids, **kwargs):
+
+        attention_masks = kwargs.pop("attention_mask")
+
+        print(attention_masks)
+
+        hidden_state_outputs = []
+        print(len(input_ids))
+        for i in range(len(input_ids)):
+            inputs = torch.unsqueeze(input_ids[i],0)
+            attn_mask = torch.ones_like(inputs)
+            encoder_outputs = self.sub_encoder.forward(inputs, attention_mask=attn_mask, **kwargs)
+            hidden_state_outputs.append(encoder_outputs["pooler_output"])
+        hidden_state_outputs = pad_sequence(hidden_state_outputs).contiguous()
+       
+        
+        pooler_output = self.bert_pooler(hidden_state_outputs).contiguous()
+
+        output = BaseModelOutputWithPoolingAndCrossAttentions(last_hidden_state=hidden_state_outputs,
+                                                              pooler_output = pooler_output)
+
+        return output
