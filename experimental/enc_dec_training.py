@@ -78,11 +78,11 @@ def train(epoch, tokenizer, model, device, loader, optimizer):
         lm_labels = y[:, 1:].clone().detach()
         lm_labels[y[:, 1:] == tokenizer.pad_token_id] = -100
         ids = data["source_ids"].to(device, dtype=torch.long)
-        mask = data["source_mask"].to(device, dtype=torch.long)
+        #mask = data["source_mask"].to(device, dtype=torch.long)
 
         outputs = model(
             input_ids=ids,
-            attention_mask=mask,
+        #    attention_mask=mask,
             decoder_input_ids=y_ids,
             labels=lm_labels,
         )
@@ -180,7 +180,7 @@ def EncDecTrainer(
 
     """
 
-    output_dir = os.path.join("experiments", experiment_name)
+    output_dir = os.path.join("experiments", model_params["EXPERIMENT_NAME"])
     os.makedirs(output_dir, exist_ok=True) 
 
 
@@ -226,7 +226,7 @@ def EncDecTrainer(
 
     import time
 
-    for epoch in range(train_epochs):
+    for epoch in range(model_params["TRAIN_EPOCHS"]):
         loop_start_time = time.time()
         #clear_output()
         train(epoch, tokenizer, model, device, training_loader, optimizer)

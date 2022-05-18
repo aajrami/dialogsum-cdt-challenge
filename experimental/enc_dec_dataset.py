@@ -77,18 +77,23 @@ class EncDecDataset(Dataset):
         source_text = datapoint_dict["dialogue"]
         target_text = datapoint_dict["summary"]
 # 
+
         source = self._dialogue_encode(source_text)
         target = self._summary_encode(target_text)
-# 
 
         source_ids = source["input_ids"].squeeze()
-        source_mask = source["attention_mask"].squeeze()
+        source_mask = torch.ones_like(source_ids)
         target_ids = target["input_ids"].squeeze()
         target_mask = target["attention_mask"].squeeze()
 
+
+
+
+
+
         return {
             "source_ids": source_ids.to(dtype=torch.long),
-            "source_mask": source_mask.to(dtype=torch.long),
+        #    "source_mask": source_mask.to(dtype=torch.long),
             "target_ids": target_ids.to(dtype=torch.long),
             "target_mask": target_mask.to(dtype=torch.long),
         }
@@ -113,12 +118,12 @@ class CustomEncoder(Module):
 
     def forward(self, input_ids, **kwargs):
 
-        attention_masks = kwargs.pop("attention_mask")
+        kwargs.pop("attention_mask")
 
-        print(attention_masks)
+      #  print(attention_masks)
 
         hidden_state_outputs = []
-        print(len(input_ids))
+        input_ids = input_ids.squeeze()
         for i in range(len(input_ids)):
             inputs = torch.unsqueeze(input_ids[i],0)
             attn_mask = torch.ones_like(inputs)
