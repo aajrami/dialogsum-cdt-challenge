@@ -1,4 +1,4 @@
-transformers == 4.12.2
+transformers == 4.38.0
 torch == 1.9.0
 datasets
 nltk
